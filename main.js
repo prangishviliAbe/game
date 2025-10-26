@@ -526,6 +526,134 @@ function createTree(x, z) {
     }
 }
 
+// Create a pine/conifer style tree with stacked cones so it reads like a fir/spruce
+function createPineTree(x, z, height = 12, scale = 1.0) {
+    const group = new THREE.Group();
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4b36, roughness: 1.0 });
+    const trunkGeo = new THREE.CylinderGeometry(0.6 * scale, 0.9 * scale, height * 0.18, 8);
+    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+    trunk.position.y = (height * 0.18) / 2;
+    trunk.castShadow = true;
+    group.add(trunk);
+
+    // stacked conical foliage layers
+    const foliageMat = new THREE.MeshStandardMaterial({ color: 0x1f6f2f, roughness: 0.9 });
+    const layers = Math.max(3, Math.floor(height / 3));
+    for (let i = 0; i < layers; i++) {
+        const topRadius = Math.max(0.5, (layers - i) * 0.6) * scale;
+        const heightLayer = Math.max(1.2, height * 0.12) * scale;
+        const coneGeo = new THREE.ConeGeometry(topRadius, heightLayer, 10);
+        const cone = new THREE.Mesh(coneGeo, foliageMat);
+        cone.position.y = trunk.position.y + (i * (heightLayer * 0.6)) + 0.5;
+        cone.castShadow = true;
+        cone.receiveShadow = true;
+        // slight random rotation for natural look
+        cone.rotation.y = (Math.random() - 0.5) * 0.6;
+        group.add(cone);
+    }
+
+    group.position.set(x, 0, z);
+    scene.add(group);
+    // remember for potential PBR updates
+    trunkMeshes.push(group);
+}
+
+// Mountains: create simple large cones using rock PBR maps if available
+function createMountains() {
+    const mountainGroup = new THREE.Group();
+    const mcount = 5;
+    for (let i = 0; i < mcount; i++) {
+        const mx = (Math.random() - 0.5) * 400;
+        const mz = -120 - Math.random() * 80 - i * 40;
+        const mHeight = 60 + Math.random() * 120;
+        const rad = mHeight * (0.7 + Math.random() * 0.6);
+        const geo = new THREE.ConeGeometry(rad, mHeight, 24);
+        // perturb vertices slightly for ruggedness
+        const pos = geo.attributes.position;
+        for (let v = 0; v < pos.count; v++) {
+            const ox = pos.getX(v);
+            const oy = pos.getY(v);
+            const oz = pos.getZ(v);
+            const n = (Math.random() - 0.5) * (mHeight * 0.02);
+            pos.setXYZ(v, ox + n, oy + n * 0.2, oz + n);
+        }
+        geo.computeVertexNormals();
+
+        const matOpts = { color: 0x7b7b7b, roughness: 0.95 };
+        if (rockColor) {
+            matOpts.map = rockColor;
+            setTextureSRGB(rockColor);
+        }
+        if (rockNormal) matOpts.normalMap = rockNormal;
+        if (rockRoughness) matOpts.roughnessMap = rockRoughness;
+        const mat = new THREE.MeshStandardMaterial(matOpts);
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(mx, mHeight / 2 - 6, mz);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mountainGroup.add(mesh);
+    }
+    scene.add(mountainGroup);
+}
+
+// Water / river: create a long plane and apply a simple shader that animates waves
+let waterUniforms = null;
+function createRiver() {
+    // create a long plane and rotate to snake through the scene roughly along Z
+    const w = 240; const l = 60;
+    const planeGeo = new THREE.PlaneGeometry(w, l, 128, 32);
+    // Shader material that displaces vertices and gives a water look
+    waterUniforms = {
+        time: { value: 0 },
+        colorA: { value: new THREE.Color(0x1e9cff) },
+        colorB: { value: new THREE.Color(0x063b78) }
+    };
+    const waterMat = new THREE.ShaderMaterial({
+        uniforms: waterUniforms,
+        vertexShader: `
+            uniform float time;
+            varying vec2 vUv;
+            varying float vWave;
+            void main() {
+                vUv = uv;
+                vec3 pos = position;
+                float wave = sin((pos.x + time * 6.0) * 0.06) * 0.6 + sin((pos.y + time * 4.0) * 0.08) * 0.4;
+                pos.z += wave * 0.8; // small vertical mod
+                vWave = wave;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+            }
+        `,
+        fragmentShader: `
+            uniform vec3 colorA;
+            uniform vec3 colorB;
+            varying vec2 vUv;
+            varying float vWave;
+            void main() {
+                float t = smoothstep(0.0, 1.0, vUv.y);
+                vec3 col = mix(colorB, colorA, t + vWave * 0.05);
+                // simple specular highlight
+                float spec = pow(0.6 - vUv.y, 12.0) * (0.6 + vWave * 0.4);
+                col += vec3(spec);
+                gl_FragColor = vec4(col, 0.95);
+            }
+        `,
+        transparent: true
+    });
+    const water = new THREE.Mesh(planeGeo, waterMat);
+    water.rotation.x = -Math.PI / 2;
+    water.position.set(0, 0.4, 0);
+    water.receiveShadow = false;
+    water.castShadow = false;
+    scene.add(water);
+
+    // slightly tilt and curve by rotating groups (simple approximation of a meandering river)
+    const bend = new THREE.Group();
+    bend.add(water);
+    bend.rotation.y = 0.12;
+    bend.position.z = 10;
+    scene.add(bend);
+}
+
 // Obstacles array for collision
 const obstacles = [];
 
@@ -535,6 +663,17 @@ for (let i = 0; i < 20; i++) {
     const z = (Math.random() - 0.5) * 100;
     createTree(x, z);
     obstacles.push({ x, z, radius: 5 }); // Approximate radius
+}
+
+// Add mountain backdrop and river, then populate some pine trees near the river
+createMountains();
+createRiver();
+// Plant a band of pine trees along the river banks
+for (let i = 0; i < 24; i++) {
+    const x = -40 + Math.random() * 80;
+    const z = -10 + Math.random() * 30; // around the river
+    createPineTree(x, z, 10 + Math.random() * 8, 0.9 + Math.random() * 0.8);
+    obstacles.push({ x, z, radius: 3 });
 }
 
 // Rocks
@@ -758,6 +897,11 @@ function animate() {
     // Optional: update sun visual (if present)
     if (sunMesh) {
         sunMesh.position.copy(directionalLight.position);
+    }
+
+    // update water animation uniform
+    if (waterUniforms && typeof waterUniforms.time !== 'undefined') {
+        waterUniforms.time.value = now * 0.001;
     }
 
     renderer.render(scene, camera);
