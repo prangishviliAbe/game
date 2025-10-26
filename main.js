@@ -342,6 +342,7 @@ for (let i = 0; i < 12; i++) {
     m.rotation.y = Math.random() * Math.PI;
     m.renderOrder = 0;
     m.material.opacity = 0.75 + Math.random() * 0.25;
+    m.castShadow = false; // clouds should not cast dynamic shadows
     cloudGroup.add(m);
 }
 scene.add(cloudGroup);
@@ -430,8 +431,9 @@ function createTree(x, z) {
         // Create an instanced leaf cluster at the branch tip; attach to the branch so positions are local
     const clusterCount = 36 + Math.floor(Math.random() * 36); // larger clusters at tips
         const mat = leafMaterialVariants[Math.floor(Math.random() * leafMaterialVariants.length)];
-        const inst = new THREE.InstancedMesh(smallLeafGeo, mat, clusterCount);
-        inst.castShadow = true;
+    const inst = new THREE.InstancedMesh(smallLeafGeo, mat, clusterCount);
+    inst.castShadow = false; // avoid many dynamic leaf shadows
+    inst.receiveShadow = false;
         const dummy = new THREE.Object3D();
         for (let i = 0; i < clusterCount; i++) {
             // small random offset local to branch (so leaves hug the branch)
@@ -454,7 +456,9 @@ function createTree(x, z) {
 
         // Also add along-branch leaf clusters to fill the branch shaft (a few small instanced leaves along the branch)
     const alongCount = 12 + Math.floor(Math.random() * 8); // more along-branch leaves
-        const instAlong = new THREE.InstancedMesh(smallLeafGeo, mat, alongCount);
+    const instAlong = new THREE.InstancedMesh(smallLeafGeo, mat, alongCount);
+    instAlong.castShadow = false;
+    instAlong.receiveShadow = false;
         const tmp = new THREE.Object3D();
         for (let k = 0; k < alongCount; k++) {
             const t = k / (alongCount - 1);
@@ -479,6 +483,8 @@ function createTree(x, z) {
     const leavesPerTree = 160 + Math.floor(Math.random() * 120); // denser canopy
     const canopyMat = leafMaterialVariants[Math.floor(Math.random() * leafMaterialVariants.length)];
     const canopyInst = new THREE.InstancedMesh(smallLeafGeo, canopyMat, leavesPerTree);
+    canopyInst.castShadow = false;
+    canopyInst.receiveShadow = false;
     const temp = new THREE.Object3D();
     for (let i = 0; i < leavesPerTree; i++) {
         const radius = 0.6 + Math.random() * 2.6;
@@ -602,11 +608,12 @@ function createRiver() {
     // create a long plane and rotate to snake through the scene roughly along Z
     const w = 240; const l = 60;
     const planeGeo = new THREE.PlaneGeometry(w, l, 128, 32);
-    // Shader material that displaces vertices and gives a water look
     waterUniforms = {
         time: { value: 0 },
         colorA: { value: new THREE.Color(0x1e9cff) },
-        colorB: { value: new THREE.Color(0x063b78) }
+        colorB: { value: new THREE.Color(0x063b78) },
+        sunDir: { value: new THREE.Vector3(0.5, 0.8, 0.2).normalize() },
+        cameraPos: { value: new THREE.Vector3() }
     };
     const waterMat = new THREE.ShaderMaterial({
         uniforms: waterUniforms,
@@ -614,26 +621,41 @@ function createRiver() {
             uniform float time;
             varying vec2 vUv;
             varying float vWave;
+            varying vec3 vPos;
             void main() {
                 vUv = uv;
                 vec3 pos = position;
-                float wave = sin((pos.x + time * 6.0) * 0.06) * 0.6 + sin((pos.y + time * 4.0) * 0.08) * 0.4;
-                pos.z += wave * 0.8; // small vertical mod
+                float wave1 = sin((pos.x + time * 6.0) * 0.06) * 0.6;
+                float wave2 = sin((pos.y + time * 4.0) * 0.08) * 0.4;
+                float wave = wave1 + wave2;
+                pos.z += wave * 0.8;
                 vWave = wave;
+                vPos = (modelMatrix * vec4(pos, 1.0)).xyz;
                 gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
             }
         `,
         fragmentShader: `
             uniform vec3 colorA;
             uniform vec3 colorB;
+            uniform vec3 sunDir;
+            uniform vec3 cameraPos;
             varying vec2 vUv;
             varying float vWave;
+            varying vec3 vPos;
             void main() {
                 float t = smoothstep(0.0, 1.0, vUv.y);
-                vec3 col = mix(colorB, colorA, t + vWave * 0.05);
-                // simple specular highlight
-                float spec = pow(0.6 - vUv.y, 12.0) * (0.6 + vWave * 0.4);
-                col += vec3(spec);
+                vec3 base = mix(colorB, colorA, t + vWave * 0.05);
+                // approximate normal from wave (small finite diff)
+                float dx = 0.06 * cos((vPos.x + 0.0) * 0.06) * 0.6 + 0.08 * cos((vPos.y + 0.0) * 0.08) * 0.4;
+                vec3 n = normalize(vec3(-dx, 1.0, -dx));
+                vec3 L = normalize(sunDir);
+                vec3 V = normalize(cameraPos - vPos);
+                vec3 R = reflect(-L, n);
+                float diff = max(dot(n, L), 0.0);
+                float spec = pow(max(dot(R, V), 0.0), 40.0);
+                vec3 col = base * (0.55 + diff * 0.6) + vec3(spec * 1.6);
+                float fres = pow(1.0 - max(dot(n, V), 0.0), 3.0) * 0.25;
+                col += fres * vec3(1.0, 1.0, 1.0) * 0.12;
                 gl_FragColor = vec4(col, 0.95);
             }
         `,
@@ -661,17 +683,91 @@ const obstacles = [];
 for (let i = 0; i < 20; i++) {
     const x = (Math.random() - 0.5) * 100;
     const z = (Math.random() - 0.5) * 100;
+    // avoid river area (we'll define a simple river bounding box)
+    if (Math.abs(z - 0) < 35 && Math.abs(x - 0) < 110) {
+        // skip placing trees in main river corridor
+        continue;
+    }
     createTree(x, z);
     obstacles.push({ x, z, radius: 5 }); // Approximate radius
+}
+
+// Houses array (positions/size) to avoid tree placement and allow entrance
+const houses = [];
+function createHouse(x, z, w = 6, d = 6, h = 4) {
+    const houseGroup = new THREE.Group();
+    // floor
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(w, 0.2, d), new THREE.MeshStandardMaterial({ color: 0x8b6b4a }));
+    floor.position.set(0, 0.1, 0);
+    floor.receiveShadow = true;
+    houseGroup.add(floor);
+    // four walls but leave a doorway in front
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xefe4d1 });
+    const halfW = w / 2, halfD = d / 2;
+    // back wall
+    const back = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.2), wallMat);
+    back.position.set(0, h / 2, -halfD + 0.1);
+    back.receiveShadow = true; back.castShadow = true; houseGroup.add(back);
+    // left wall
+    const left = new THREE.Mesh(new THREE.BoxGeometry(0.2, h, d), wallMat);
+    left.position.set(-halfW + 0.1, h / 2, 0);
+    left.receiveShadow = true; left.castShadow = true; houseGroup.add(left);
+    // right wall
+    const right = new THREE.Mesh(new THREE.BoxGeometry(0.2, h, d), wallMat);
+    right.position.set(halfW - 0.1, h / 2, 0);
+    right.receiveShadow = true; right.castShadow = true; houseGroup.add(right);
+    // front wall sections with door gap
+    const doorW = 1.2;
+    const frontLeft = new THREE.Mesh(new THREE.BoxGeometry((w - doorW) / 2, h, 0.2), wallMat);
+    frontLeft.position.set(- (w + doorW) / 4, h / 2, halfD - 0.1);
+    frontLeft.receiveShadow = true; frontLeft.castShadow = true; houseGroup.add(frontLeft);
+    const frontRight = new THREE.Mesh(new THREE.BoxGeometry((w - doorW) / 2, h, 0.2), wallMat);
+    frontRight.position.set((w + doorW) / 4, h / 2, halfD - 0.1);
+    frontRight.receiveShadow = true; frontRight.castShadow = true; houseGroup.add(frontRight);
+    // roof
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) * 0.75, h * 0.8, 4), new THREE.MeshStandardMaterial({ color: 0x7a3b2a }));
+    roof.rotation.y = Math.PI / 4;
+    roof.position.set(0, h + 0.6, 0);
+    roof.castShadow = true; roof.receiveShadow = false; houseGroup.add(roof);
+
+    houseGroup.position.set(x, 0, z);
+    scene.add(houseGroup);
+    houses.push({ x, z, w, d });
+}
+
+// Create 4 houses spaced on map (away from river)
+createHouse(-30, 30, 7, 6, 4);
+createHouse(35, 25, 6, 8, 4);
+createHouse(-20, -40, 8, 7, 4.5);
+createHouse(40, -35, 6, 6, 4);
+
+// Remove any previously-placed trees that overlap house footprints (we placed trees earlier)
+for (const h of houses) {
+    for (let i = trunkMeshes.length - 1; i >= 0; i--) {
+        const t = trunkMeshes[i];
+        const tx = t.position.x, tz = t.position.z;
+        const dist = Math.hypot(tx - h.x, tz - h.z);
+        if (dist < Math.max(h.w, h.d) * 1.2) {
+            if (t.parent) t.parent.remove(t);
+            scene.remove(t);
+            trunkMeshes.splice(i, 1);
+        }
+    }
+    // prune obstacles near houses too
+    for (let j = obstacles.length - 1; j >= 0; j--) {
+        const ox = obstacles[j].x, oz = obstacles[j].z;
+        if (Math.hypot(ox - h.x, oz - h.z) < Math.max(h.w, h.d) * 1.2) obstacles.splice(j, 1);
+    }
 }
 
 // Add mountain backdrop and river, then populate some pine trees near the river
 createMountains();
 createRiver();
-// Plant a band of pine trees along the river banks
+// Plant pine trees along river banks (avoid placing them directly in the river corridor)
 for (let i = 0; i < 24; i++) {
-    const x = -40 + Math.random() * 80;
-    const z = -10 + Math.random() * 30; // around the river
+    const side = (i % 2 === 0) ? -1 : 1; // alternate banks
+    const x = side * (20 + Math.random() * 30);
+    const z = -10 + (Math.random() * 8) + (side * (5 + Math.random() * 6));
     createPineTree(x, z, 10 + Math.random() * 8, 0.9 + Math.random() * 0.8);
     obstacles.push({ x, z, radius: 3 });
 }
@@ -890,8 +986,11 @@ function animate() {
 
     // Animate clouds slowly
     cloudGroup.children.forEach((c, idx) => {
-        c.position.x += Math.sin(now * 0.0001 + idx) * 0.02;
-        c.position.z += Math.cos(now * 0.00008 + idx) * 0.02;
+        // drift and slow bobbing
+        c.position.x += Math.sin(now * 0.00012 + idx) * 0.02;
+        c.position.z += Math.cos(now * 0.00009 + idx) * 0.02;
+        c.position.y += Math.sin(now * 0.0002 + idx) * 0.002; // subtle vertical bob
+        c.rotation.y += 0.00005 * (idx % 3 - 1); // slow rotation variation
     });
 
     // Optional: update sun visual (if present)
@@ -899,9 +998,11 @@ function animate() {
         sunMesh.position.copy(directionalLight.position);
     }
 
-    // update water animation uniform
+    // update water animation uniform and camera/sun uniforms
     if (waterUniforms && typeof waterUniforms.time !== 'undefined') {
         waterUniforms.time.value = now * 0.001;
+        if (waterUniforms.sunDir) waterUniforms.sunDir.value.copy(directionalLight.position).normalize();
+        if (waterUniforms.cameraPos) waterUniforms.cameraPos.value.copy(camera.position);
     }
 
     renderer.render(scene, camera);
