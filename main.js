@@ -44,12 +44,48 @@ const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x444444, 0.5);
 scene.add(hemiLight);
 
 // Player character
+const playerGroup = new THREE.Group();
 const playerGeometry = new THREE.CapsuleGeometry(0.5, 1, 4, 8);
 const playerMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
-const player = new THREE.Mesh(playerGeometry, playerMaterial);
-player.position.set(0, 1, 0);
-player.castShadow = true;
-scene.add(player);
+const body = new THREE.Mesh(playerGeometry, playerMaterial);
+body.position.set(0, 1, 0);
+body.castShadow = true;
+playerGroup.add(body);
+
+// Add arms
+const armGeo = new THREE.CylinderGeometry(0.15, 0.15, 1.0);
+const armMat = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+const leftArm = new THREE.Mesh(armGeo, armMat);
+leftArm.position.set(-0.5, 1.0, 0);
+leftArm.castShadow = true;
+playerGroup.add(leftArm);
+const rightArm = new THREE.Mesh(armGeo, armMat);
+rightArm.position.set(0.5, 1.0, 0);
+rightArm.castShadow = true;
+playerGroup.add(rightArm);
+
+// Add hands
+const handGeo = new THREE.SphereGeometry(0.3);
+const handMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+const leftHand = new THREE.Mesh(handGeo, handMat);
+leftHand.position.set(-0.5, 0.5, 0);
+leftHand.castShadow = true;
+playerGroup.add(leftHand);
+const rightHand = new THREE.Mesh(handGeo, handMat);
+rightHand.position.set(0.5, 0.5, 0);
+rightHand.castShadow = true;
+playerGroup.add(rightHand);
+
+// Add stick in right hand
+const stickGeo = new THREE.CylinderGeometry(0.03, 0.03, 1.0);
+const stickMat = new THREE.MeshStandardMaterial({ color: 0x654321 });
+const stick = new THREE.Mesh(stickGeo, stickMat);
+stick.position.set(0.5, 0.5, 0.2);
+stick.rotation.z = -0.7; // tilt for holding
+stick.castShadow = true;
+playerGroup.add(stick);
+
+scene.add(playerGroup);
 
 // Camera / controls setup (we use pointer lock for immersive adventure)
 camera.position.set(0, 2, 0); // camera height relative to player
@@ -85,12 +121,16 @@ let leavesTex = null;
 let barkColor = null, barkNormal = null, barkRoughness = null;
 let leafAlbedo = null, leafAlpha = null, leafNormal = null;
 let rockColor = null, rockNormal = null, rockRoughness = null;
+let sandColor = null, sandNormal = null, sandRoughness = null;
+let woodColor = null, woodNormal = null, woodRoughness = null;
+let skinColor = null, skinNormal = null, skinRoughness = null;
 let brickColor = null, brickNormal = null, brickRoughness = null;
 
 // Keep references to created meshes so we can apply textures after async load
 const trunkMeshes = [];
 const leafMeshes = [];
 const rockMeshes = [];
+const mountainMeshes = [];
 const wallMaterials = [];
 
 // Helper: try local asset first, then fall back to CDN URL
@@ -134,6 +174,13 @@ tryLoadTexture('assets/textures/pbr/grass_color.jpg', 'https://threejs.org/examp
         ground.material.map = groundTex;
         ground.material.needsUpdate = true;
     }
+    // apply to mountain materials
+    for (const m of mountainMeshes) {
+        if (m.material) {
+            m.material.map = groundTex;
+            m.material.needsUpdate = true;
+        }
+    }
 });
 
 // PBR bark/color maps are loaded later from `assets/textures/pbr/` and will be applied to trunks when ready.
@@ -156,10 +203,11 @@ let waterColorTex = null;
 tryLoadTexture('assets/textures/pbr/grass_color.jpg', 'https://threejs.org/examples/textures/terrain/grasslight-big.jpg', (t) => {
     waterColorTex = t;
     setTextureSRGB(waterColorTex);
-    if (water && water.material) {
-        water.material.uniforms['waterTexture'].value = waterColorTex;
-        water.material.needsUpdate = true;
-    }
+    // Do not apply grass texture to water to avoid artifacts
+    // if (water && water.material) {
+    //     water.material.uniforms['waterTexture'].value = waterColorTex;
+    //     water.material.needsUpdate = true;
+    // }
 });
 
 // Try load PBR placeholders (local pbr folder); fall back to existing textures where sensible
@@ -236,17 +284,31 @@ tryLoadTexture('assets/textures/pbr/leaf_normal.jpg', 'assets/textures/ball.png'
     }
 });
 
-tryLoadTexture('assets/textures/pbr/rock_color.jpg', 'assets/textures/grasslight-big.jpg', (t) => {
+tryLoadTexture('assets/textures/pbr/rock_color.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rock_01/rock_01_diff_1k.jpg', (t) => {
     rockColor = t;
     setTextureSRGB(rockColor);
+    // Avoid applying UV-grid placeholder textures (they contain numeric labels)
+    const src = t.image && (t.image.currentSrc || t.image.src) ? (t.image.currentSrc || t.image.src) : '';
+    if (/uv[_-]?grid|grid/i.test(src)) {
+        console.warn('PBR rock_color is a UV grid placeholder; skipping map to avoid numbers showing on mountains.');
+        rockColor = null;
+        return;
+    }
     for (const r of rockMeshes) {
         if (r.material) {
             r.material.map = rockColor;
             r.material.needsUpdate = true;
         }
     }
+    // apply to mountain materials
+    for (const m of mountainMeshes) {
+        if (m.material) {
+            m.material.map = rockColor;
+            m.material.needsUpdate = true;
+        }
+    }
 });
-tryLoadTexture('assets/textures/pbr/rock_normal.jpg', 'assets/textures/ball.png', (t) => {
+tryLoadTexture('assets/textures/pbr/rock_normal.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rock_01/rock_01_nor_gl_1k.jpg', (t) => {
     rockNormal = t;
     for (const r of rockMeshes) {
         if (r.material) {
@@ -255,7 +317,7 @@ tryLoadTexture('assets/textures/pbr/rock_normal.jpg', 'assets/textures/ball.png'
         }
     }
 });
-tryLoadTexture('assets/textures/pbr/rock_roughness.jpg', 'assets/textures/ball.png', (t) => {
+tryLoadTexture('assets/textures/pbr/rock_roughness.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rock_01/rock_01_rough_1k.jpg', (t) => {
     rockRoughness = t;
     for (const r of rockMeshes) {
         if (r.material) {
@@ -263,6 +325,113 @@ tryLoadTexture('assets/textures/pbr/rock_roughness.jpg', 'assets/textures/ball.p
             r.material.roughness = 1.0;
             r.material.needsUpdate = true;
         }
+    }
+    // apply to mountains
+    for (const m of mountainMeshes) {
+        if (m.material && m.material.userData && m.material.userData.type === 'rock') {
+            m.material.roughnessMap = rockRoughness;
+            m.material.roughness = 1.0;
+            m.material.needsUpdate = true;
+        }
+    }
+});
+
+tryLoadTexture('assets/textures/pbr/sand_color.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/sand_01/sand_01_diff_1k.jpg', (t) => {
+    sandColor = t;
+    setTextureSRGB(sandColor);
+    // apply to mountains with sand type
+    for (const m of mountainMeshes) {
+        if (m.material && m.material.userData && m.material.userData.type === 'sand') {
+            m.material.map = sandColor;
+            m.material.needsUpdate = true;
+        }
+    }
+});
+tryLoadTexture('assets/textures/pbr/sand_normal.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/sand_01/sand_01_nor_gl_1k.jpg', (t) => {
+    sandNormal = t;
+    for (const m of mountainMeshes) {
+        if (m.material && m.material.userData && m.material.userData.type === 'sand') {
+            m.material.normalMap = sandNormal;
+            m.material.needsUpdate = true;
+        }
+    }
+});
+tryLoadTexture('assets/textures/pbr/sand_roughness.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/sand_01/sand_01_rough_1k.jpg', (t) => {
+    sandRoughness = t;
+    for (const m of mountainMeshes) {
+        if (m.material && m.material.userData && m.material.userData.type === 'sand') {
+            m.material.roughnessMap = sandRoughness;
+            m.material.roughness = 1.0;
+            m.material.needsUpdate = true;
+        }
+    }
+});
+
+tryLoadTexture('assets/textures/pbr/wood_color.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wood_01/wood_01_diff_1k.jpg', (t) => {
+    woodColor = t;
+    setTextureSRGB(woodColor);
+    // apply to doors
+    for (const h of houses) {
+        if (h.group && h.group.userData.door) {
+            h.group.userData.door.material.map = woodColor;
+            h.group.userData.door.material.needsUpdate = true;
+        }
+    }
+});
+tryLoadTexture('assets/textures/pbr/wood_normal.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wood_01/wood_01_nor_gl_1k.jpg', (t) => {
+    woodNormal = t;
+    for (const h of houses) {
+        if (h.group && h.group.userData.door) {
+            h.group.userData.door.material.normalMap = woodNormal;
+            h.group.userData.door.material.needsUpdate = true;
+        }
+    }
+});
+tryLoadTexture('assets/textures/pbr/wood_roughness.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wood_01/wood_01_rough_1k.jpg', (t) => {
+    woodRoughness = t;
+    for (const h of houses) {
+        if (h.group && h.group.userData.door) {
+            h.group.userData.door.material.roughnessMap = woodRoughness;
+            h.group.userData.door.material.roughness = 1.0;
+            h.group.userData.door.material.needsUpdate = true;
+        }
+    }
+});
+
+tryLoadTexture('assets/textures/pbr/skin_color.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leather_01/leather_01_diff_1k.jpg', (t) => {
+    skinColor = t;
+    setTextureSRGB(skinColor);
+    // apply to hands
+    if (playerGroup) {
+        playerGroup.children.forEach(child => {
+            if (child.geometry.type === 'SphereGeometry') { // hands
+                child.material.map = skinColor;
+                child.material.needsUpdate = true;
+            }
+        });
+    }
+});
+tryLoadTexture('assets/textures/pbr/skin_normal.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leather_01/leather_01_nor_gl_1k.jpg', (t) => {
+    skinNormal = t;
+    if (playerGroup) {
+        playerGroup.children.forEach(child => {
+            if (child.geometry.type === 'SphereGeometry') {
+                child.material.normalMap = skinNormal;
+                child.material.needsUpdate = true;
+            }
+        });
+    }
+});
+tryLoadTexture('assets/textures/pbr/skin_roughness.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leather_01/leather_01_rough_1k.jpg', (t) => {
+    skinRoughness = t;
+    if (playerGroup) {
+        playerGroup.children.forEach(child => {
+            if (child.geometry.type === 'SphereGeometry') {
+                child.material.roughnessMap = skinRoughness;
+                child.material.roughness = 1.0;
+                child.material.needsUpdate = true;
+            }
+        });
     }
 });
 
@@ -303,24 +472,27 @@ ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-// Water
-const waterGeometry = new THREE.PlaneGeometry(10000, 10000);
+// Water as a river
+const waterGeometry = new THREE.PlaneGeometry(20, 300);
 const water = new Water(
     waterGeometry,
     {
         textureWidth: 512,
         textureHeight: 512,
+        clipBias: 0.003,
         waterNormals: new THREE.TextureLoader().load('https://threejs.org/examples/textures/waternormals.jpg', function (texture) {
             texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
         }),
         sunDirection: new THREE.Vector3(),
         sunColor: 0xffffff,
         waterColor: 0x001e0f,
-        distortionScale: 3.7,
+        distortionScale: 5.0,
+        waterTextureScale: 0.05,
         fog: scene.fog !== undefined
     }
 );
 water.rotation.x = - Math.PI / 2;
+water.position.set(0, 0, -100); // Position closer to the map
 scene.add(water);
 
 // // Skybox
@@ -390,7 +562,7 @@ function createTree(x, z) {
     const branchCount = 3 + Math.floor(Math.random() * 3); // 3-5 branches for fuller canopy
 
     // Prepare leaf materials and geometry for instancing
-    const smallLeafGeo = new THREE.PlaneGeometry(0.45, 0.7);
+    const smallLeafGeo = new THREE.PlaneGeometry(0.3, 0.5);
     const leafMaterialBase = () => new THREE.MeshStandardMaterial({
         color: 0x1e7a1e,
         map: leafAlbedo || leavesTex || null,
@@ -450,7 +622,7 @@ function createTree(x, z) {
             const rz = (Math.random() - 0.5) * 0.9;
             dummy.position.set(rx, ry, rz);
             dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-            const scale = 0.28 + Math.random() * 0.8;
+            const scale = 0.15 + Math.random() * 0.4;
             dummy.scale.set(scale, scale, scale);
             dummy.updateMatrix();
             inst.setMatrixAt(i, dummy.matrix);
@@ -475,7 +647,7 @@ function createTree(x, z) {
             const lz = (Math.random() - 0.5) * 0.6;
             tmp.position.set(lx, ly, lz);
             tmp.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-            const s = 0.22 + Math.random() * 0.6;
+            const s = 0.12 + Math.random() * 0.3;
             tmp.scale.set(s, s, s);
             tmp.updateMatrix();
             instAlong.setMatrixAt(k, tmp.matrix);
@@ -500,7 +672,7 @@ function createTree(x, z) {
         const height = 6 + Math.random() * 6;
         temp.position.set(Math.cos(angle) * radius, height, Math.sin(angle) * radius);
         temp.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-        const scale = 0.25 + Math.random() * 1.0;
+        const scale = 0.15 + Math.random() * 0.5;
         temp.scale.set(scale, scale, scale);
         temp.updateMatrix();
         canopyInst.setMatrixAt(i, temp.matrix);
@@ -572,6 +744,39 @@ function createPineTree(x, z, height = 12, scale = 1.0) {
     trunkMeshes.push(group);
 }
 
+// Create a birch tree with white bark and black stripes
+function createBirchTree(x, z, height = 15, scale = 1.0) {
+    const group = new THREE.Group();
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 });
+    const trunkGeo = new THREE.CylinderGeometry(0.4 * scale, 0.6 * scale, height * 0.9, 8);
+    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+    trunk.position.y = (height * 0.9) / 2;
+    trunk.castShadow = true;
+    group.add(trunk);
+
+    // Add black stripes on trunk
+    const stripeCount = 10;
+    for (let i = 0; i < stripeCount; i++) {
+        const stripeGeo = new THREE.CylinderGeometry(0.61 * scale, 0.61 * scale, 0.1, 8);
+        const stripeMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
+        const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+        stripe.position.y = (height * 0.9) * (i / stripeCount) - (height * 0.9) / 2 + 0.05;
+        group.add(stripe);
+    }
+
+    // Add leaves
+    const leafGeo = new THREE.SphereGeometry(2 * scale, 10, 8);
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0x228B22, roughness: 0.9 });
+    const leaves = new THREE.Mesh(leafGeo, leafMat);
+    leaves.position.y = height * 0.9 + 1;
+    leaves.castShadow = true;
+    group.add(leaves);
+
+    group.position.set(x, 0, z);
+    scene.add(group);
+    trunkMeshes.push(group);
+}
+
 // Mountains: create simple large cones using rock PBR maps if available
 function createMountains() {
     const mountainGroup = new THREE.Group();
@@ -579,36 +784,49 @@ function createMountains() {
     for (let i = 0; i < mcount; i++) {
         const mx = (Math.random() - 0.5) * 400;
         const mz = -120 - Math.random() * 80 - i * 40;
-        const mHeight = 60 + Math.random() * 120;
-        const rad = mHeight * (0.7 + Math.random() * 0.6);
-        const geo = new THREE.ConeGeometry(rad, mHeight, 24);
-        // perturb vertices slightly for ruggedness
+        const mHeight = 30 + Math.random() * 60;
+        const rad = mHeight * (0.5 + Math.random() * 0.4);
+        const geo = new THREE.ConeGeometry(rad, mHeight, 32);
+        // perturb vertices for ruggedness
         const pos = geo.attributes.position;
         for (let v = 0; v < pos.count; v++) {
             const ox = pos.getX(v);
             const oy = pos.getY(v);
             const oz = pos.getZ(v);
-            const n = (Math.random() - 0.5) * (mHeight * 0.02);
-            pos.setXYZ(v, ox + n, oy + n * 0.2, oz + n);
+            const n = (Math.random() - 0.5) * (mHeight * 0.1);
+            pos.setXYZ(v, ox + n, oy + n * 0.3, oz + n);
         }
         geo.computeVertexNormals();
 
-        const matOpts = { color: 0x7b7b7b, roughness: 0.95 };
-        if (rockColor) {
-            matOpts.map = rockColor;
-            setTextureSRGB(rockColor);
+        // Randomly choose between rock and sand
+        const isSand = Math.random() < 0.5;
+        const matOpts = { color: isSand ? 0xD2B48C : 0x7b7b7b, roughness: 0.95 };
+        if (isSand) {
+            if (sandColor) {
+                matOpts.map = sandColor;
+                setTextureSRGB(sandColor);
+            }
+            if (sandNormal) matOpts.normalMap = sandNormal;
+            if (sandRoughness) matOpts.roughnessMap = sandRoughness;
+        } else {
+            if (rockColor) {
+                matOpts.map = rockColor;
+                setTextureSRGB(rockColor);
+            }
+            if (rockNormal) matOpts.normalMap = rockNormal;
+            if (rockRoughness) matOpts.roughnessMap = rockRoughness;
         }
-        if (rockNormal) matOpts.normalMap = rockNormal;
-        if (rockRoughness) matOpts.roughnessMap = rockRoughness;
         const mat = new THREE.MeshStandardMaterial(matOpts);
+        mat.userData = { type: isSand ? 'sand' : 'rock' };
         const mesh = new THREE.Mesh(geo, mat);
-        mesh.position.set(mx, mHeight / 2 - 6, mz);
+        mesh.position.set(mx, 0, mz);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         mountainGroup.add(mesh);
+        mountainMeshes.push(mesh);
 
         // Add bushes around the mountain base for greenery
-        for (let b = 0; b < 4; b++) {
+        for (let b = 0; b < 8; b++) {
             const bx = mx + (Math.random() - 0.5) * (rad * 2);
             const bz = mz + (Math.random() - 0.5) * (rad * 2);
             createBush(bx, bz);
@@ -616,11 +834,33 @@ function createMountains() {
         }
 
         // Add rocks around the mountain for additional detail
-        for (let r = 0; r < 3; r++) {
+        for (let r = 0; r < 6; r++) {
             const rx = mx + (Math.random() - 0.5) * (rad * 1.5);
             const rz = mz + (Math.random() - 0.5) * (rad * 1.5);
             createRock(rx, rz);
             obstacles.push({ x: rx, z: rz, radius: 2 });
+        }
+
+        // Add pines around the mountain
+        for (let p = 0; p < 5; p++) {
+            const px = mx + (Math.random() - 0.5) * (rad * 2.5);
+            const pz = mz + (Math.random() - 0.5) * (rad * 2.5);
+            createPineTree(px, pz, 8 + Math.random() * 6, 0.7 + Math.random() * 0.5);
+            obstacles.push({ x: px, z: pz, radius: 3 });
+        }
+
+        // Add pines on mountain slopes
+        for (let p = 0; p < 3; p++) {
+            const px = mx + (Math.random() - 0.5) * (rad * 0.8);
+            const pz = mz + (Math.random() - 0.5) * (rad * 0.8);
+            const py = mHeight / 2 - 6 + Math.random() * (mHeight * 0.3); // on the slope
+            createPineTree(px, pz, 6 + Math.random() * 4, 0.5 + Math.random() * 0.3);
+            // Adjust position to be on the mountain
+            const pine = trunkMeshes[trunkMeshes.length - 1];
+            if (pine) {
+                pine.position.y = py;
+                obstacles.push({ x: px, z: pz, radius: 2 });
+            }
         }
     }
     scene.add(mountainGroup);
@@ -635,6 +875,14 @@ for (let i = 0; i < 20; i++) {
     const z = (Math.random() - 0.5) * 100;
     createTree(x, z);
     obstacles.push({ x, z, radius: 5 }); // Approximate radius
+}
+
+// Add birch trees
+for (let i = 0; i < 15; i++) {
+    const x = (Math.random() - 0.5) * 100;
+    const z = (Math.random() - 0.5) * 100;
+    createBirchTree(x, z, 12 + Math.random() * 8, 0.8 + Math.random() * 0.4);
+    obstacles.push({ x, z, radius: 3 });
 }
 
 // Houses array (positions/size) to avoid tree placement and allow entrance
@@ -671,6 +919,16 @@ function createHouse(x, z, w = 6, d = 6, h = 4) {
     const frontRight = new THREE.Mesh(new THREE.BoxGeometry((w - doorW) / 2, h, 0.2), wallMat);
     frontRight.position.set((w + doorW) / 4, h / 2, halfD - 0.1);
     frontRight.receiveShadow = true; frontRight.castShadow = true; houseGroup.add(frontRight);
+
+    // Add door
+    const doorGeo = new THREE.BoxGeometry(doorW, h, 0.1);
+    const doorMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+    const door = new THREE.Mesh(doorGeo, doorMat);
+    door.position.set(0, h / 2, halfD - 0.05);
+    door.castShadow = true;
+    houseGroup.add(door);
+    // Store door for animation
+    houseGroup.userData.door = door;
     // roof - use bark/wood texture if available for a rustic look
     const roofMatOpts = { color: 0x7a3b2a };
     if (barkColor) { roofMatOpts.map = barkColor; setTextureSRGB(barkColor); }
@@ -683,7 +941,7 @@ function createHouse(x, z, w = 6, d = 6, h = 4) {
 
     houseGroup.position.set(x, 0, z);
     scene.add(houseGroup);
-    houses.push({ x, z, w, d });
+    houses.push({ x, z, w, d, group: houseGroup });
 }
 
 // Create 4 houses spaced on map (away from river)
@@ -711,16 +969,8 @@ for (const h of houses) {
     }
 }
 
-// Add mountain backdrop and river, then populate some pine trees near the river
+// Add mountain backdrop and river
 createMountains();
-// Plant pine trees along river banks (avoid placing them directly in the river corridor)
-for (let i = 0; i < 24; i++) {
-    const side = (i % 2 === 0) ? -1 : 1; // alternate banks
-    const x = side * (20 + Math.random() * 30);
-    const z = -10 + (Math.random() * 8) + (side * (5 + Math.random() * 6));
-    createPineTree(x, z, 10 + Math.random() * 8, 0.9 + Math.random() * 0.8);
-    obstacles.push({ x, z, radius: 3 });
-}
 
 // Rocks
 function createRock(x, z) {
@@ -955,8 +1205,8 @@ function animate() {
     }
 
     // Sync visible player mesh to camera position (offset down so camera is at head)
-    player.position.set(camera.position.x, 1, camera.position.z);
-    player.rotation.y = camera.rotation.y;
+    playerGroup.position.set(camera.position.x, 0, camera.position.z);
+    playerGroup.rotation.y = camera.rotation.y;
 
     // Check for collectibles
     for (let i = collectibles.length - 1; i >= 0; i--) {
@@ -986,6 +1236,16 @@ function animate() {
     // update water animation uniform
     water.material.uniforms['time'].value += 1.0 / 60.0;
     water.material.uniforms['sunDirection'].value.copy(directionalLight.position).normalize();
+
+    // Animate house doors
+    for (const h of houses) {
+        const dist = Math.hypot(camera.position.x - h.x, camera.position.z - h.z);
+        if (h.group && h.group.userData.door) {
+            const door = h.group.userData.door;
+            const targetRotation = dist < 3 ? -Math.PI / 2 : 0;
+            door.rotation.y = THREE.MathUtils.lerp(door.rotation.y, targetRotation, 0.1);
+        }
+    }
 
     renderer.render(scene, camera);
 }

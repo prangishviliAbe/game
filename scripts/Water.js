@@ -48,6 +48,7 @@ class Water extends Mesh {
 		const sunColor = new Color( options.sunColor !== undefined ? options.sunColor : 0xffffff );
 		const waterColor = new Color( options.waterColor !== undefined ? options.waterColor : 0x7F7F7F );
 		const waterTexture = options.waterTexture !== undefined ? options.waterTexture : null;
+		const waterTextureScale = options.waterTextureScale !== undefined ? options.waterTextureScale : 0.01;
 		const eye = options.eye !== undefined ? options.eye : new Vector3( 0, 0, 0 );
 		const distortionScale = options.distortionScale !== undefined ? options.distortionScale : 20.0;
 		const side = options.side !== undefined ? options.side : FrontSide;
@@ -90,7 +91,8 @@ class Water extends Mesh {
 					'sunDirection': { value: new Vector3( 0.70707, 0.70707, 0 ) },
 					'eye': { value: new Vector3() },
 					'waterColor': { value: new Color( 0x555555 ) },
-					'waterTexture': { value: null }
+					'waterTexture': { value: null },
+					'waterTextureScale': { value: 0.01 }
 				}
 			] ),
 
@@ -136,6 +138,7 @@ class Water extends Mesh {
 				uniform vec3 eye;
 				uniform vec3 waterColor;
 				uniform sampler2D waterTexture;
+				uniform float waterTextureScale;
 
 				varying vec4 mirrorCoord;
 				varying vec4 worldPosition;
@@ -188,7 +191,7 @@ class Water extends Mesh {
 					vec3 scatter = max( 0.0, dot( surfaceNormal, eyeDirection ) ) * waterColor;
 					vec3 albedo = mix( ( sunColor * diffuseLight * 0.3 + scatter ), ( vec3( 0.1 ) + reflectionSample * 0.9 + reflectionSample * specularLight ), reflectance);
 					if (waterTexture != null) {
-						vec3 texColor = texture2D(waterTexture, worldPosition.xz * 0.01).rgb;
+						vec3 texColor = texture2D(waterTexture, worldPosition.xz * waterTextureScale).rgb;
 						albedo = mix(albedo, texColor, 0.3);
 					}
 
@@ -221,6 +224,7 @@ class Water extends Mesh {
 		material.uniforms[ 'sunColor' ].value = sunColor;
 		material.uniforms[ 'waterColor' ].value = waterColor;
 		material.uniforms[ 'waterTexture' ].value = waterTexture;
+		material.uniforms[ 'waterTextureScale' ].value = waterTextureScale;
 		material.uniforms[ 'sunDirection' ].value = sunDirection;
 		material.uniforms[ 'distortionScale' ].value = distortionScale;
 		material.uniforms[ 'eye' ].value = eye;
@@ -348,6 +352,7 @@ class Water extends Mesh {
  * @property {number|Color|string} [sunColor=0xffffff] - The sun color.
  * @property {number|Color|string} [waterColor=0x7F7F7F] - The water color.
  * @property {?Texture} [waterTexture=null] - The water's color texture.
+ * @property {number} [waterTextureScale=0.01] - The scale for the water texture.
  * @property {Vector3} [eye] - The eye vector.
  * @property {number} [distortionScale=20] - The distortion scale.
  * @property {(FrontSide|BackSide|DoubleSide)} [side=FrontSide] - The water material's `side` property.
