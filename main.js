@@ -378,7 +378,7 @@ function createTree(x, z) {
     trunkMeshes.push(trunkGroup);
 
     // Add branching stubs (make branches more visible and use them as leaf attachment points)
-    const branchCount = 2 + Math.floor(Math.random() * 3);
+    const branchCount = 3 + Math.floor(Math.random() * 3); // 3-5 branches for fuller canopy
 
     // Prepare leaf materials and geometry for instancing
     const smallLeafGeo = new THREE.PlaneGeometry(0.45, 0.7);
@@ -411,9 +411,9 @@ function createTree(x, z) {
     // Create more prominent branches and attach small instanced leaf clusters to their tips
     for (let b = 0; b < branchCount; b++) {
         const segIndex = 1 + Math.floor(Math.random() * (segmentCount - 2));
-        const branchLen = 3.0 + Math.random() * 3.0;
-        const branchThickness = 0.18 + Math.random() * 0.18;
-        const branchGeo = new THREE.CylinderGeometry(branchThickness * 0.6, branchThickness, branchLen, 8);
+    const branchLen = 4.0 + Math.random() * 4.0; // longer branches
+    const branchThickness = 0.25 + Math.random() * 0.35; // thicker branches
+    const branchGeo = new THREE.CylinderGeometry(branchThickness * 0.6, branchThickness, branchLen, 10);
         const branch = new THREE.Mesh(branchGeo, trunkMaterial);
         branch.castShadow = true;
         // place the base near the chosen segment height
@@ -427,34 +427,56 @@ function createTree(x, z) {
         branch.rotation.y = angle + (Math.random() - 0.5) * 0.4;
         trunkGroup.add(branch);
 
-        // Create an instanced leaf cluster at the branch tip
-        const clusterCount = 20 + Math.floor(Math.random() * 20);
+        // Create an instanced leaf cluster at the branch tip; attach to the branch so positions are local
+    const clusterCount = 36 + Math.floor(Math.random() * 36); // larger clusters at tips
         const mat = leafMaterialVariants[Math.floor(Math.random() * leafMaterialVariants.length)];
         const inst = new THREE.InstancedMesh(smallLeafGeo, mat, clusterCount);
         inst.castShadow = true;
         const dummy = new THREE.Object3D();
         for (let i = 0; i < clusterCount; i++) {
-            // position relative to branch tip
-            const rx = (Math.random() - 0.5) * 0.8;
-            const ry = (Math.random() - 0.0) * 0.8;
-            const rz = (Math.random() - 0.5) * 0.8;
-            dummy.position.set(branch.position.x + rx, branch.position.y + branchLen * 0.45 + ry, branch.position.z + rz);
+            // small random offset local to branch (so leaves hug the branch)
+            const rx = (Math.random() - 0.5) * 0.9;
+            const ry = (Math.random() * 0.9) + branchLen * 0.35; // biased toward tip
+            const rz = (Math.random() - 0.5) * 0.9;
+            dummy.position.set(rx, ry, rz);
             dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-            const scale = 0.3 + Math.random() * 0.9;
+            const scale = 0.28 + Math.random() * 0.8;
             dummy.scale.set(scale, scale, scale);
             dummy.updateMatrix();
             inst.setMatrixAt(i, dummy.matrix);
-            // set per-instance color if supported
             if (inst.setColorAt) inst.setColorAt(i, mat.color);
         }
         inst.instanceMatrix.needsUpdate = true;
         if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
-        canopyGroup.add(inst);
+        // Add the instanced cluster as a child of the branch so it's positioned at branch local origin
+        branch.add(inst);
         leafMeshes.push(inst);
+
+        // Also add along-branch leaf clusters to fill the branch shaft (a few small instanced leaves along the branch)
+    const alongCount = 12 + Math.floor(Math.random() * 8); // more along-branch leaves
+        const instAlong = new THREE.InstancedMesh(smallLeafGeo, mat, alongCount);
+        const tmp = new THREE.Object3D();
+        for (let k = 0; k < alongCount; k++) {
+            const t = k / (alongCount - 1);
+            const lx = (Math.random() - 0.5) * 0.6;
+            const ly = branchLen * (0.1 + t * 0.8);
+            const lz = (Math.random() - 0.5) * 0.6;
+            tmp.position.set(lx, ly, lz);
+            tmp.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+            const s = 0.22 + Math.random() * 0.6;
+            tmp.scale.set(s, s, s);
+            tmp.updateMatrix();
+            instAlong.setMatrixAt(k, tmp.matrix);
+            if (instAlong.setColorAt) instAlong.setColorAt(k, mat.color);
+        }
+        instAlong.instanceMatrix.needsUpdate = true;
+        if (instAlong.instanceColor) instAlong.instanceColor.needsUpdate = true;
+        branch.add(instAlong);
+        leafMeshes.push(instAlong);
     }
 
     // Create a larger canopy as an instanced mesh attached to the trunkGroup
-    const leavesPerTree = 80 + Math.floor(Math.random() * 80);
+    const leavesPerTree = 160 + Math.floor(Math.random() * 120); // denser canopy
     const canopyMat = leafMaterialVariants[Math.floor(Math.random() * leafMaterialVariants.length)];
     const canopyInst = new THREE.InstancedMesh(smallLeafGeo, canopyMat, leavesPerTree);
     const temp = new THREE.Object3D();
@@ -475,6 +497,22 @@ function createTree(x, z) {
     canopyGroup.add(canopyInst);
 
     trunkGroup.add(canopyGroup);
+
+    // Add a few soft trunk-top clusters to fill the crown base
+    for (let tc = 0; tc < 3; tc++) {
+        const topClusterGeo = new THREE.SphereGeometry(1.2 + Math.random() * 1.6, 10, 8);
+        const topMat = new THREE.MeshStandardMaterial({
+            color: new THREE.Color(0x1f7b1f).offsetHSL(0, 0, (Math.random() - 0.5) * 0.06),
+            roughness: 0.95,
+            transparent: true,
+            opacity: 0.98
+        });
+        const top = new THREE.Mesh(topClusterGeo, topMat);
+        top.position.set((Math.random() - 0.5) * 1.2, totalHeight - 2 + Math.random() * 2.5, (Math.random() - 0.5) * 1.2);
+        top.castShadow = true;
+        trunkGroup.add(top);
+        leafMeshes.push(top);
+    }
 
     // Add vines
     for (let i = 0; i < 3; i++) {
