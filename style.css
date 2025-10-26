@@ -1,0 +1,94 @@
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #87CEEB;
+}
+
+#game-canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+}
+
+#game-ui {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    color: white;
+    font-family: Arial, sans-serif;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+    z-index: 100;
+}
+
+/* Start screen overlay */
+#start-screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.6));
+    z-index: 200;
+}
+
+.start-panel {
+    background: rgba(255,255,255,0.05);
+    padding: 30px;
+    border-radius: 10px;
+    color: #fff;
+    text-align: center;
+    width: 360px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+}
+
+.start-panel h1 {
+    margin: 0 0 10px 0;
+    font-size: 28px;
+    color: #FFD700;
+}
+
+.start-panel p {
+    margin: 0 0 12px 0;
+}
+
+.start-panel ul { text-align: left; margin: 8px 0 14px 0; padding-left: 18px; }
+
+#start-button {
+    padding: 10px 18px;
+    font-size: 16px;
+    background: linear-gradient(180deg,#3a8b3a,#2a6b2a);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+#start-button:active { transform: translateY(1px); }
+
+.score {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 20px;
+    background: rgba(0,0,0,0.5);
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.controls {
+    background: rgba(0,0,0,0.5);
+    padding: 15px;
+    border-radius: 5px;
+    max-width: 200px;
+}
+
+.controls h3 {
+    margin-top: 0;
+    color: #FFD700;
+}
+
+.controls p {
+    margin: 5px 0;
+    font-size: 14px;
+}
