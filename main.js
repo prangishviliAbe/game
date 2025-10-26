@@ -1,24 +1,19 @@
 import * as THREE from 'three';
-import { PointerLockControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/PointerLockControls.js';
+import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+import { Water } from './scripts/Water.js';
+import { Sky } from './scripts/Sky.js';
 
 // Scene setup
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB); // Sky blue background
 scene.fog = new THREE.Fog(0x87CEEB, 50, 200); // Add fog for depth
 
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
 const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('game-canvas'), antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-// Newer Three.js versions removed outputEncoding; prefer outputColorSpace when available.
-if ('outputColorSpace' in renderer) {
-    // Use SRGB color space if present, otherwise fall back to sRGBEncoding constant
-    const sRGB = (THREE.SRGBColorSpace !== undefined) ? THREE.SRGBColorSpace : (THREE.sRGBEncoding !== undefined ? THREE.sRGBEncoding : undefined);
-    if (sRGB !== undefined) renderer.outputColorSpace = sRGB;
-} else if ('outputEncoding' in renderer && THREE.sRGBEncoding !== undefined) {
-    renderer.outputEncoding = THREE.sRGBEncoding;
-}
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
 
 // Lighting
 const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
@@ -47,14 +42,6 @@ scene.add(directionalLight);
 // Hemisphere fill for ambient blue sky and warm ground bounce
 const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x444444, 0.5);
 scene.add(hemiLight);
-
-// Sun visual: small emissive sphere to represent the sun position
-const sunMat = new THREE.MeshBasicMaterial({ color: 0xfff1a8 });
-const sunGeo = new THREE.SphereGeometry(6, 12, 12);
-const sunMesh = new THREE.Mesh(sunGeo, sunMat);
-sunMesh.position.copy(directionalLight.position);
-sunMesh.renderOrder = 999;
-scene.add(sunMesh);
 
 // Player character
 const playerGeometry = new THREE.CapsuleGeometry(0.5, 1, 4, 8);
@@ -98,63 +85,13 @@ let leavesTex = null;
 let barkColor = null, barkNormal = null, barkRoughness = null;
 let leafAlbedo = null, leafAlpha = null, leafNormal = null;
 let rockColor = null, rockNormal = null, rockRoughness = null;
+let brickColor = null, brickNormal = null, brickRoughness = null;
+
 // Keep references to created meshes so we can apply textures after async load
 const trunkMeshes = [];
 const leafMeshes = [];
 const rockMeshes = [];
-
-// Procedural helper: create a soft cloud texture using canvas (used as fallback)
-function createCloudCanvasTexture(size = 512) {
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    // clear
-    ctx.clearRect(0, 0, size, size);
-    // radial gradient for a soft blob
-    const grad = ctx.createRadialGradient(size/2, size/2, size*0.05, size/2, size/2, size*0.6);
-    grad.addColorStop(0, 'rgba(255,255,255,0.95)');
-    grad.addColorStop(0.6, 'rgba(245,245,245,0.8)');
-    grad.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, size, size);
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.needsUpdate = true;
-    return tex;
-}
-
-// Procedural helper: create a simple leaf-shaped texture (alpha) via canvas
-function createLeafCanvasTexture(w = 256, h = 256) {
-    const canvas = document.createElement('canvas');
-    canvas.width = w; canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, w, h);
-    // draw a leaf shape
-    ctx.translate(w/2, h/2);
-    ctx.rotate(-Math.PI/6);
-    ctx.scale(1, 0.9);
-    ctx.beginPath();
-    ctx.moveTo(-w*0.2, 0);
-    ctx.quadraticCurveTo(-w*0.5, -h*0.4, 0, -h*0.45);
-    ctx.quadraticCurveTo(w*0.5, -h*0.4, w*0.2, 0);
-    ctx.quadraticCurveTo(w*0.1, h*0.35, 0, h*0.45);
-    ctx.quadraticCurveTo(-w*0.1, h*0.35, -w*0.2, 0);
-    const grad = ctx.createLinearGradient(-w*0.2, -h*0.4, w*0.2, h*0.4);
-    grad.addColorStop(0, '#2e8b57');
-    grad.addColorStop(1, '#4caf50');
-    ctx.fillStyle = grad;
-    ctx.fill();
-    // subtle stroke
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = 'rgba(30,80,30,0.6)';
-    ctx.stroke();
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.needsUpdate = true;
-    return tex;
-}
-
-// Create procedural fallbacks now
-const proceduralCloudTex = createCloudCanvasTexture(512);
-const proceduralLeafTex = createLeafCanvasTexture(256, 256);
+const wallMaterials = [];
 
 // Helper: try local asset first, then fall back to CDN URL
 function tryLoadTexture(localPath, cdnUrl, onLoad) {
@@ -184,7 +121,7 @@ function setTextureSRGB(tex) {
 }
 
 // Try loading a grass texture for the ground (local first)
-tryLoadTexture('assets/textures/grasslight-big.jpg', 'https://threejs.org/examples/textures/terrain/grasslight-big.jpg', (t) => {
+tryLoadTexture('assets/textures/pbr/grass_color.jpg', 'https://threejs.org/examples/textures/terrain/grasslight-big.jpg', (t) => {
     groundTex = t;
     groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping;
     groundTex.repeat.set(40, 40);
@@ -199,7 +136,6 @@ tryLoadTexture('assets/textures/grasslight-big.jpg', 'https://threejs.org/exampl
     }
 });
 
-// NOTE: removed legacy UV-grid trunk loader to avoid accidental 404s and visible numbered test textures.
 // PBR bark/color maps are loaded later from `assets/textures/pbr/` and will be applied to trunks when ready.
 // Try a simple leaf/particle sprite (local first, then fallback to a sprite that exists)
 tryLoadTexture('assets/textures/ball.png', 'https://threejs.org/examples/textures/sprites/ball.png', (t) => {
@@ -215,10 +151,16 @@ tryLoadTexture('assets/textures/ball.png', 'https://threejs.org/examples/texture
     }
 });
 
-// If external leaf texture isn't available, use procedural leaf texture
-if (!leavesTex) {
-    leavesTex = proceduralLeafTex;
-}
+// Load water texture for enhanced water graphics
+let waterColorTex = null;
+tryLoadTexture('assets/textures/pbr/grass_color.jpg', 'https://threejs.org/examples/textures/terrain/grasslight-big.jpg', (t) => {
+    waterColorTex = t;
+    setTextureSRGB(waterColorTex);
+    if (water && water.material) {
+        water.material.uniforms['waterTexture'].value = waterColorTex;
+        water.material.needsUpdate = true;
+    }
+});
 
 // Try load PBR placeholders (local pbr folder); fall back to existing textures where sensible
 tryLoadTexture('assets/textures/pbr/bark_color.jpg', 'assets/textures/ball.png', (t) => {
@@ -324,6 +266,36 @@ tryLoadTexture('assets/textures/pbr/rock_roughness.jpg', 'assets/textures/ball.p
     }
 });
 
+tryLoadTexture('assets/textures/pbr/brick_color.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
+    brickColor = t;
+    setTextureSRGB(brickColor);
+    for (const m of wallMaterials) {
+        if (m) {
+            m.map = brickColor;
+            m.needsUpdate = true;
+        }
+    }
+});
+tryLoadTexture('assets/textures/pbr/brick_normal.jpg', 'https://threejs.org/examples/textures/brick_normal.jpg', (t) => {
+    brickNormal = t;
+    for (const m of wallMaterials) {
+        if (m) {
+            m.normalMap = brickNormal;
+            m.needsUpdate = true;
+        }
+    }
+});
+tryLoadTexture('assets/textures/pbr/brick_roughness.jpg', 'assets/textures/ball.png', (t) => {
+    brickRoughness = t;
+    for (const m of wallMaterials) {
+        if (m) {
+            m.roughnessMap = brickRoughness;
+            m.roughness = 1.0;
+            m.needsUpdate = true;
+        }
+    }
+});
+
 const groundGeometry = new THREE.PlaneGeometry(200, 200);
 const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x2b7a2b, map: groundTex }); // Forest green fallback
 const ground = new THREE.Mesh(groundGeometry, groundMaterial);
@@ -331,21 +303,57 @@ ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-// Add sky / clouds: a few large billboards high above that slowly drift
-const cloudGroup = new THREE.Group();
-const cloudMat = new THREE.MeshBasicMaterial({ map: proceduralCloudTex, transparent: true, depthWrite: false, opacity: 0.95 });
-for (let i = 0; i < 12; i++) {
-    const size = 60 + Math.random() * 120;
-    const geo = new THREE.PlaneGeometry(size, size * 0.6);
-    const m = new THREE.Mesh(geo, cloudMat.clone());
-    m.position.set((Math.random() - 0.5) * 300, 60 + Math.random() * 40, (Math.random() - 0.5) * 300);
-    m.rotation.y = Math.random() * Math.PI;
-    m.renderOrder = 0;
-    m.material.opacity = 0.75 + Math.random() * 0.25;
-    m.castShadow = false; // clouds should not cast dynamic shadows
-    cloudGroup.add(m);
-}
-scene.add(cloudGroup);
+// Water
+const waterGeometry = new THREE.PlaneGeometry(10000, 10000);
+const water = new Water(
+    waterGeometry,
+    {
+        textureWidth: 512,
+        textureHeight: 512,
+        waterNormals: new THREE.TextureLoader().load('https://threejs.org/examples/textures/waternormals.jpg', function (texture) {
+            texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+        }),
+        sunDirection: new THREE.Vector3(),
+        sunColor: 0xffffff,
+        waterColor: 0x001e0f,
+        distortionScale: 3.7,
+        fog: scene.fog !== undefined
+    }
+);
+water.rotation.x = - Math.PI / 2;
+scene.add(water);
+
+// // Skybox
+// const sky = new Sky();
+// sky.scale.setScalar(10000);
+// scene.add(sky);
+
+// const skyUniforms = sky.material.uniforms;
+// skyUniforms['turbidity'].value = 10;
+// skyUniforms['rayleigh'].value = 2;
+// skyUniforms['mieCoefficient'].value = 0.005;
+// skyUniforms['mieDirectionalG'].value = 0.8;
+
+// const sun = new THREE.Vector3();
+// const pmremGenerator = new THREE.PMREMGenerator(renderer);
+// let renderTarget;
+
+// function updateSun() {
+//     const phi = THREE.MathUtils.degToRad(90 - 5);
+//     const theta = THREE.MathUtils.degToRad(180);
+
+//     sun.setFromSphericalCoords(1, phi, theta);
+
+//     sky.material.uniforms['sunPosition'].value.copy(sun);
+//     water.material.uniforms['sunDirection'].value.copy(sun).normalize();
+
+//     if (renderTarget) renderTarget.dispose();
+
+//     renderTarget = pmremGenerator.fromScene(sky);
+//     scene.environment = renderTarget.texture;
+// }
+
+// updateSun();
 
 // Trees
 function createTree(x, z) {
@@ -598,82 +606,24 @@ function createMountains() {
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         mountainGroup.add(mesh);
+
+        // Add bushes around the mountain base for greenery
+        for (let b = 0; b < 4; b++) {
+            const bx = mx + (Math.random() - 0.5) * (rad * 2);
+            const bz = mz + (Math.random() - 0.5) * (rad * 2);
+            createBush(bx, bz);
+            obstacles.push({ x: bx, z: bz, radius: 3 });
+        }
+
+        // Add rocks around the mountain for additional detail
+        for (let r = 0; r < 3; r++) {
+            const rx = mx + (Math.random() - 0.5) * (rad * 1.5);
+            const rz = mz + (Math.random() - 0.5) * (rad * 1.5);
+            createRock(rx, rz);
+            obstacles.push({ x: rx, z: rz, radius: 2 });
+        }
     }
     scene.add(mountainGroup);
-}
-
-// Water / river: create a long plane and apply a simple shader that animates waves
-let waterUniforms = null;
-function createRiver() {
-    // create a long plane and rotate to snake through the scene roughly along Z
-    const w = 240; const l = 60;
-    const planeGeo = new THREE.PlaneGeometry(w, l, 128, 32);
-    waterUniforms = {
-        time: { value: 0 },
-        colorA: { value: new THREE.Color(0x1e9cff) },
-        colorB: { value: new THREE.Color(0x063b78) },
-        sunDir: { value: new THREE.Vector3(0.5, 0.8, 0.2).normalize() },
-        cameraPos: { value: new THREE.Vector3() }
-    };
-    const waterMat = new THREE.ShaderMaterial({
-        uniforms: waterUniforms,
-        vertexShader: `
-            uniform float time;
-            varying vec2 vUv;
-            varying float vWave;
-            varying vec3 vPos;
-            void main() {
-                vUv = uv;
-                vec3 pos = position;
-                float wave1 = sin((pos.x + time * 6.0) * 0.06) * 0.6;
-                float wave2 = sin((pos.y + time * 4.0) * 0.08) * 0.4;
-                float wave = wave1 + wave2;
-                pos.z += wave * 0.8;
-                vWave = wave;
-                vPos = (modelMatrix * vec4(pos, 1.0)).xyz;
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-            }
-        `,
-        fragmentShader: `
-            uniform vec3 colorA;
-            uniform vec3 colorB;
-            uniform vec3 sunDir;
-            uniform vec3 cameraPos;
-            varying vec2 vUv;
-            varying float vWave;
-            varying vec3 vPos;
-            void main() {
-                float t = smoothstep(0.0, 1.0, vUv.y);
-                vec3 base = mix(colorB, colorA, t + vWave * 0.05);
-                // approximate normal from wave (small finite diff)
-                float dx = 0.06 * cos((vPos.x + 0.0) * 0.06) * 0.6 + 0.08 * cos((vPos.y + 0.0) * 0.08) * 0.4;
-                vec3 n = normalize(vec3(-dx, 1.0, -dx));
-                vec3 L = normalize(sunDir);
-                vec3 V = normalize(cameraPos - vPos);
-                vec3 R = reflect(-L, n);
-                float diff = max(dot(n, L), 0.0);
-                float spec = pow(max(dot(R, V), 0.0), 40.0);
-                vec3 col = base * (0.55 + diff * 0.6) + vec3(spec * 1.6);
-                float fres = pow(1.0 - max(dot(n, V), 0.0), 3.0) * 0.25;
-                col += fres * vec3(1.0, 1.0, 1.0) * 0.12;
-                gl_FragColor = vec4(col, 0.95);
-            }
-        `,
-        transparent: true
-    });
-    const water = new THREE.Mesh(planeGeo, waterMat);
-    water.rotation.x = -Math.PI / 2;
-    water.position.set(0, 0.4, 0);
-    water.receiveShadow = false;
-    water.castShadow = false;
-    scene.add(water);
-
-    // slightly tilt and curve by rotating groups (simple approximation of a meandering river)
-    const bend = new THREE.Group();
-    bend.add(water);
-    bend.rotation.y = 0.12;
-    bend.position.z = 10;
-    scene.add(bend);
 }
 
 // Obstacles array for collision
@@ -683,11 +633,6 @@ const obstacles = [];
 for (let i = 0; i < 20; i++) {
     const x = (Math.random() - 0.5) * 100;
     const z = (Math.random() - 0.5) * 100;
-    // avoid river area (we'll define a simple river bounding box)
-    if (Math.abs(z - 0) < 35 && Math.abs(x - 0) < 110) {
-        // skip placing trees in main river corridor
-        continue;
-    }
     createTree(x, z);
     obstacles.push({ x, z, radius: 5 }); // Approximate radius
 }
@@ -702,7 +647,9 @@ function createHouse(x, z, w = 6, d = 6, h = 4) {
     floor.receiveShadow = true;
     houseGroup.add(floor);
     // four walls but leave a doorway in front
+    // prefer PBR brick textures if available
     const wallMat = new THREE.MeshStandardMaterial({ color: 0xefe4d1 });
+    wallMaterials.push(wallMat);
     const halfW = w / 2, halfD = d / 2;
     // back wall
     const back = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.2), wallMat);
@@ -724,8 +671,12 @@ function createHouse(x, z, w = 6, d = 6, h = 4) {
     const frontRight = new THREE.Mesh(new THREE.BoxGeometry((w - doorW) / 2, h, 0.2), wallMat);
     frontRight.position.set((w + doorW) / 4, h / 2, halfD - 0.1);
     frontRight.receiveShadow = true; frontRight.castShadow = true; houseGroup.add(frontRight);
-    // roof
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) * 0.75, h * 0.8, 4), new THREE.MeshStandardMaterial({ color: 0x7a3b2a }));
+    // roof - use bark/wood texture if available for a rustic look
+    const roofMatOpts = { color: 0x7a3b2a };
+    if (barkColor) { roofMatOpts.map = barkColor; setTextureSRGB(barkColor); }
+    if (barkNormal) roofMatOpts.normalMap = barkNormal;
+    if (barkRoughness) { roofMatOpts.roughnessMap = barkRoughness; roofMatOpts.roughness = 1.0; }
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) * 0.75, h * 0.8, 4), new THREE.MeshStandardMaterial(roofMatOpts));
     roof.rotation.y = Math.PI / 4;
     roof.position.set(0, h + 0.6, 0);
     roof.castShadow = true; roof.receiveShadow = false; houseGroup.add(roof);
@@ -762,7 +713,6 @@ for (const h of houses) {
 
 // Add mountain backdrop and river, then populate some pine trees near the river
 createMountains();
-createRiver();
 // Plant pine trees along river banks (avoid placing them directly in the river corridor)
 for (let i = 0; i < 24; i++) {
     const side = (i % 2 === 0) ? -1 : 1; // alternate banks
@@ -809,6 +759,30 @@ for (let i = 0; i < 10; i++) {
     obstacles.push({ x, z, radius: 2 });
 }
 
+let cloudGroup = new THREE.Group();
+scene.add(cloudGroup);
+
+function createClouds() {
+    const cloudMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.8,
+    });
+    for (let i = 0; i < 15; i++) {
+        const size = 10 + Math.random() * 20;
+        const cloudGeo = new THREE.SphereGeometry(size, 12, 12);
+        const cloud = new THREE.Mesh(cloudGeo, cloudMaterial);
+        cloud.position.set(
+            (Math.random() - 0.5) * 400,
+            100 + Math.random() * 50,
+            (Math.random() - 0.5) * 400
+        );
+        cloudGroup.add(cloud);
+    }
+}
+
+createClouds();
+
 // Bushes
 function createBush(x, z) {
     // Build a bush from overlapping small spheres/leaf-clusters for more natural silhouette
@@ -822,6 +796,20 @@ function createBush(x, z) {
             roughness: 0.9,
             metalness: 0.0
         });
+        // If leaf PBR/albedo available, use it for richer bushes
+        if (leafAlbedo) {
+            mat.map = leafAlbedo;
+            mat.transparent = true;
+            mat.alphaTest = 0.18;
+            mat.depthWrite = false;
+            setTextureSRGB(leafAlbedo);
+        } else if (leavesTex) {
+            mat.map = leavesTex;
+            mat.transparent = true;
+            mat.alphaTest = 0.18;
+            mat.depthWrite = false;
+            setTextureSRGB(leavesTex);
+        }
         const m = new THREE.Mesh(geo, mat);
         m.position.set((Math.random() - 0.5) * 1.6 + x, size * 0.5 + Math.random() * 0.6, (Math.random() - 0.5) * 1.6 + z);
         m.castShadow = true;
@@ -985,25 +973,19 @@ function animate() {
     }
 
     // Animate clouds slowly
-    cloudGroup.children.forEach((c, idx) => {
-        // drift and slow bobbing
-        c.position.x += Math.sin(now * 0.00012 + idx) * 0.02;
-        c.position.z += Math.cos(now * 0.00009 + idx) * 0.02;
-        c.position.y += Math.sin(now * 0.0002 + idx) * 0.002; // subtle vertical bob
-        c.rotation.y += 0.00005 * (idx % 3 - 1); // slow rotation variation
-    });
-
-    // Optional: update sun visual (if present)
-    if (sunMesh) {
-        sunMesh.position.copy(directionalLight.position);
+    if(cloudGroup) {
+        cloudGroup.children.forEach((c, idx) => {
+            // drift and slow bobbing
+            c.position.x += Math.sin(now * 0.00012 + idx) * 0.02;
+            c.position.z += Math.cos(now * 0.00009 + idx) * 0.02;
+            c.position.y += Math.sin(now * 0.0002 + idx) * 0.002; // subtle vertical bob
+            c.rotation.y += 0.00005 * (idx % 3 - 1); // slow rotation variation
+        });
     }
 
-    // update water animation uniform and camera/sun uniforms
-    if (waterUniforms && typeof waterUniforms.time !== 'undefined') {
-        waterUniforms.time.value = now * 0.001;
-        if (waterUniforms.sunDir) waterUniforms.sunDir.value.copy(directionalLight.position).normalize();
-        if (waterUniforms.cameraPos) waterUniforms.cameraPos.value.copy(camera.position);
-    }
+    // update water animation uniform
+    water.material.uniforms['time'].value += 1.0 / 60.0;
+    water.material.uniforms['sunDirection'].value.copy(directionalLight.position).normalize();
 
     renderer.render(scene, camera);
 }
@@ -1080,7 +1062,7 @@ function autoTuneVisuals() {
     }
 }
 
-// Run an initial automatic tuning pass
+// Run an an initial automatic tuning pass
 autoTuneVisuals();
 
 // Handle window resize
@@ -1089,3 +1071,47 @@ window.addEventListener('resize', () => {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+// Expose a runtime handle for the editor to avoid import/export edge-cases
+window.__GAME = {
+    scene,
+    camera,
+    renderer,
+    trunkMeshes,
+    rockMeshes,
+    leafMeshes,
+    wallMaterials,
+    createTree,
+    createRock,
+    createHouse,
+    createBush,
+    createFruit,
+    collectibles,
+    houses,
+    obstacles,
+    ground,
+    loader,
+    tryLoadTexture,
+};
+
+// Also export named symbols for environments that prefer module imports
+export {
+    scene,
+    camera,
+    renderer,
+    trunkMeshes,
+    rockMeshes,
+    leafMeshes,
+    wallMaterials,
+    createTree,
+    createRock,
+    createHouse,
+    createBush,
+    createFruit,
+    collectibles,
+    houses,
+    obstacles,
+    ground,
+    loader,
+    tryLoadTexture,
+};
