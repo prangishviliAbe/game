@@ -1205,12 +1205,13 @@ function createBush(x, z) {
     const bladeGeo = new THREE.PlaneGeometry(0.2, 1.0); // Width and height for grass blade
     const bladeMat = new THREE.MeshStandardMaterial({
         color: 0x228B22,
-        map: grassColor || leafAlbedo || leavesTex,
-        normalMap: grassNormal,
+        map: leafAlbedo || leavesTex || grassColor,
+        alphaMap: leafAlpha,
+        normalMap: leafNormal || grassNormal,
         roughnessMap: grassRoughness,
         roughness: 1.0,
         transparent: true,
-        alphaTest: 0.5,
+        alphaTest: 0.3,
         side: THREE.DoubleSide,
         depthWrite: false
     });
