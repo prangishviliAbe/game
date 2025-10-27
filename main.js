@@ -6,7 +6,7 @@ import { Sky } from './scripts/Sky.js';
 // Scene setup
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB); // Sky blue background
-scene.fog = new THREE.Fog(0x87CEEB, 50, 200); // Add fog for depth
+scene.fog = new THREE.Fog(0x87CEEB, 50, 500); // Add fog for depth, increased far for mountains
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
 const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('game-canvas'), antialias: true });
@@ -42,6 +42,13 @@ scene.add(directionalLight);
 // Hemisphere fill for ambient blue sky and warm ground bounce
 const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x444444, 0.5);
 scene.add(hemiLight);
+
+// Realistic sun
+const sunGeometry = new THREE.SphereGeometry(10, 16, 16);
+const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xfff1c1 });
+const sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
+sunMesh.position.set(80, 120, 50);
+scene.add(sunMesh);
 
 // Player character
 const playerGroup = new THREE.Group();
@@ -472,14 +479,16 @@ ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-// Water as a river
-const waterGeometry = new THREE.PlaneGeometry(20, 300);
+// Water as a river with banks
+const riverWidth = 8;
+const riverLength = 300;
+const waterGeometry = new THREE.PlaneGeometry(riverWidth, riverLength, 10, 10); // More segments for smoothness
 const water = new Water(
     waterGeometry,
     {
         textureWidth: 512,
         textureHeight: 512,
-        clipBias: 1.0, // Increased to reduce flickering
+        clipBias: 2.0, // Increased to reduce flickering
         waterNormals: new THREE.TextureLoader().load('https://threejs.org/examples/textures/waternormals.jpg', function (texture) {
             texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
         }),
@@ -493,40 +502,97 @@ const water = new Water(
     }
 );
 water.rotation.x = - Math.PI / 2;
-water.position.set(0, -0.1, -100); // Below ground to prevent clipping with trees
+water.position.set(0, 0.01, -100); // Slightly above ground to prevent z-fighting
 scene.add(water);
 
-// // Skybox
-// const sky = new Sky();
-// sky.scale.setScalar(10000);
-// scene.add(sky);
+// Add banks around the river
+const bankHeight = 0.5;
+const bankWidth = 2;
+const leftBankGeo = new THREE.BoxGeometry(bankWidth, bankHeight, riverLength);
+const rightBankGeo = new THREE.BoxGeometry(bankWidth, bankHeight, riverLength);
+const bankMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+const leftBank = new THREE.Mesh(leftBankGeo, bankMat);
+leftBank.position.set(-riverWidth / 2 - bankWidth / 2, 0, -100);
+leftBank.receiveShadow = true;
+scene.add(leftBank);
+const rightBank = new THREE.Mesh(rightBankGeo, bankMat);
+rightBank.position.set(riverWidth / 2 + bankWidth / 2, 0, -100);
+rightBank.receiveShadow = true;
+scene.add(rightBank);
 
-// const skyUniforms = sky.material.uniforms;
-// skyUniforms['turbidity'].value = 10;
-// skyUniforms['rayleigh'].value = 2;
-// skyUniforms['mieCoefficient'].value = 0.005;
-// skyUniforms['mieDirectionalG'].value = 0.8;
+// Add flowers along the banks
+function createFlower(x, z) {
+    const flowerGroup = new THREE.Group();
 
-// const sun = new THREE.Vector3();
-// const pmremGenerator = new THREE.PMREMGenerator(renderer);
-// let renderTarget;
+    // Stem
+    const stemGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.5);
+    const stemMat = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+    const stem = new THREE.Mesh(stemGeo, stemMat);
+    stem.position.set(0, 0.25, 0);
+    stem.castShadow = true;
+    flowerGroup.add(stem);
 
-// function updateSun() {
-//     const phi = THREE.MathUtils.degToRad(90 - 5);
-//     const theta = THREE.MathUtils.degToRad(180);
+    // Petals
+    const petalGeo = new THREE.SphereGeometry(0.1, 8, 6);
+    const petalMat = new THREE.MeshLambertMaterial({ color: 0xFF69B4 });
+    for (let i = 0; i < 5; i++) {
+        const petal = new THREE.Mesh(petalGeo, petalMat);
+        const angle = (i / 5) * Math.PI * 2;
+        petal.position.set(Math.cos(angle) * 0.15, 0.5, Math.sin(angle) * 0.15);
+        petal.castShadow = true;
+        flowerGroup.add(petal);
+    }
 
-//     sun.setFromSphericalCoords(1, phi, theta);
+    flowerGroup.position.set(x, bankHeight, z);
+    scene.add(flowerGroup);
+}
 
-//     sky.material.uniforms['sunPosition'].value.copy(sun);
-//     water.material.uniforms['sunDirection'].value.copy(sun).normalize();
+// Add flowers along the left bank
+for (let i = 0; i < 20; i++) {
+    const x = -riverWidth / 2 - bankWidth - 1 + Math.random() * 2;
+    const z = -100 + (i / 20) * riverLength;
+    createFlower(x, z);
+}
 
-//     if (renderTarget) renderTarget.dispose();
+// Add flowers along the right bank
+for (let i = 0; i < 20; i++) {
+    const x = riverWidth / 2 + bankWidth + 1 + Math.random() * 2;
+    const z = -100 + (i / 20) * riverLength;
+    createFlower(x, z);
+}
 
-//     renderTarget = pmremGenerator.fromScene(sky);
-//     scene.environment = renderTarget.texture;
-// }
+// Skybox for reflections
+const sky = new Sky();
+sky.scale.setScalar(10000);
+scene.add(sky);
 
-// updateSun();
+const skyUniforms = sky.material.uniforms;
+skyUniforms['turbidity'].value = 10;
+skyUniforms['rayleigh'].value = 2;
+skyUniforms['mieCoefficient'].value = 0.005;
+skyUniforms['mieDirectionalG'].value = 0.8;
+
+const sun = new THREE.Vector3();
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+let renderTarget;
+
+function updateSun() {
+    const phi = THREE.MathUtils.degToRad(90 - 5);
+    const theta = THREE.MathUtils.degToRad(180);
+
+    sun.setFromSphericalCoords(1, phi, theta);
+    sunMesh.position.copy(sun.multiplyScalar(200)); // Scale and position sun mesh
+
+    sky.material.uniforms['sunPosition'].value.copy(sun);
+    water.material.uniforms['sunDirection'].value.copy(sun).normalize();
+
+    if (renderTarget) renderTarget.dispose();
+
+    renderTarget = pmremGenerator.fromScene(sky);
+    scene.environment = renderTarget.texture;
+}
+
+updateSun();
 
 // Trees
 function createTree(x, z) {
@@ -1024,19 +1090,95 @@ function createClouds() {
         opacity: 0.8,
     });
     for (let i = 0; i < 15; i++) {
-        const size = 10 + Math.random() * 20;
-        const cloudGeo = new THREE.SphereGeometry(size, 12, 12);
-        const cloud = new THREE.Mesh(cloudGeo, cloudMaterial);
-        cloud.position.set(
+        const cloudGroup = new THREE.Group();
+        const pieces = 5 + Math.floor(Math.random() * 5);
+        for (let j = 0; j < pieces; j++) {
+            const size = 5 + Math.random() * 10;
+            const cloudGeo = new THREE.SphereGeometry(size, 8, 6);
+            const cloud = new THREE.Mesh(cloudGeo, cloudMaterial);
+            cloud.position.set(
+                (Math.random() - 0.5) * 20,
+                (Math.random() - 0.5) * 10,
+                (Math.random() - 0.5) * 20
+            );
+            cloudGroup.add(cloud);
+        }
+        cloudGroup.position.set(
             (Math.random() - 0.5) * 400,
             100 + Math.random() * 50,
             (Math.random() - 0.5) * 400
         );
-        cloudGroup.add(cloud);
+        cloudGroup.children.forEach(child => {
+            child.castShadow = false;
+            child.receiveShadow = false;
+        });
+        scene.add(cloudGroup);
     }
 }
 
 createClouds();
+
+// Rain system
+const rainDrops = [];
+const rainCount = 1000;
+const rainGeometry = new THREE.CylinderGeometry(0.05, 0.05, 2, 4);
+const rainMaterial = new THREE.MeshBasicMaterial({ color: 0x87CEEB, transparent: true, opacity: 0.6 });
+
+for (let i = 0; i < rainCount; i++) {
+    const drop = new THREE.Mesh(rainGeometry, rainMaterial);
+    drop.position.set(
+        (Math.random() - 0.5) * 200,
+        50 + Math.random() * 100,
+        (Math.random() - 0.5) * 200
+    );
+    drop.rotation.z = Math.random() * Math.PI;
+    drop.visible = false;
+    scene.add(drop);
+    rainDrops.push(drop);
+}
+
+let isRaining = false;
+let rainTimer = 0;
+const rainInterval = 60; // Rain every 60 seconds
+const rainDuration = 10; // Rain for 10 seconds
+
+function updateWeather(delta) {
+    rainTimer += delta;
+    if (rainTimer > rainInterval) {
+        isRaining = true;
+        rainTimer = 0;
+    }
+    if (isRaining) {
+        if (rainTimer < rainDuration) {
+            // Start or continue rain
+            for (const drop of rainDrops) {
+                drop.visible = true;
+                drop.position.y -= 20 * delta; // Fall speed
+                if (drop.position.y < 0) {
+                    drop.position.y = 50 + Math.random() * 100;
+                    drop.position.x = (Math.random() - 0.5) * 200;
+                    drop.position.z = (Math.random() - 0.5) * 200;
+                }
+            }
+            // Darken clouds
+            cloudGroup.children.forEach(cloud => {
+                cloud.material.color.setHex(0x888888);
+                cloud.material.opacity = 0.9;
+            });
+        } else {
+            // Stop rain
+            isRaining = false;
+            for (const drop of rainDrops) {
+                drop.visible = false;
+            }
+            // Restore clouds
+            cloudGroup.children.forEach(cloud => {
+                cloud.material.color.setHex(0xffffff);
+                cloud.material.opacity = 0.8;
+            });
+        }
+    }
+}
 
 // Bushes
 function createBush(x, z) {
@@ -1383,20 +1525,25 @@ function animate() {
         }
     }
 
-    // Animate clouds slowly
+    // Animate clouds slowly and realistically
     if(cloudGroup) {
         cloudGroup.children.forEach((c, idx) => {
-            // drift and slow bobbing
-            c.position.x += Math.sin(now * 0.00012 + idx) * 0.02;
-            c.position.z += Math.cos(now * 0.00009 + idx) * 0.02;
-            c.position.y += Math.sin(now * 0.0002 + idx) * 0.002; // subtle vertical bob
-            c.rotation.y += 0.00005 * (idx % 3 - 1); // slow rotation variation
+            // Slow drift in one direction
+            c.position.x += 0.01 * delta;
+            c.position.z += 0.005 * delta;
+            // Subtle bobbing
+            c.position.y += Math.sin(now * 0.0001 + idx) * 0.001;
+            // Slow rotation
+            c.rotation.y += 0.0001 * delta;
         });
     }
 
-    // update water animation uniform
-    water.material.uniforms['time'].value += 2.0 / 60.0;
+    // update water animation uniform (slower for realism)
+    water.material.uniforms['time'].value += 0.5 / 60.0;
     water.material.uniforms['sunDirection'].value.copy(directionalLight.position).normalize();
+
+    // update sky for reflections
+    sky.material.uniforms['sunPosition'].value.copy(sun);
 
     // Animate house doors
     for (const h of houses) {
@@ -1469,6 +1616,9 @@ function animate() {
         person.z += moveZ;
         person.group.position.set(person.x, 0, person.z);
     }
+
+    // Update weather
+    updateWeather(delta);
 
     renderer.render(scene, camera);
 }
