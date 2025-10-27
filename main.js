@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-import { Water } from './scripts/Water.js';
+import { Water } from 'three/addons/objects/Water.js';
 import { Sky } from './scripts/Sky.js';
 
 // Scene setup
@@ -211,7 +211,7 @@ tryLoadTexture('assets/textures/pbr/grass_color.jpg', 'https://threejs.org/examp
 });
 
 // Try load PBR placeholders (local pbr folder); fall back to existing textures where sensible
-tryLoadTexture('assets/textures/pbr/bark_color.jpg', 'assets/textures/ball.png', (t) => {
+tryLoadTexture('assets/textures/pbr/bark_color.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
     barkColor = t;
     setTextureSRGB(barkColor);
     try { barkColor.anisotropy = renderer.capabilities.getMaxAnisotropy(); } catch (e) {}
@@ -229,7 +229,7 @@ tryLoadTexture('assets/textures/pbr/bark_color.jpg', 'assets/textures/ball.png',
         }
     }
 });
-tryLoadTexture('assets/textures/pbr/bark_normal.jpg', 'assets/textures/ball.png', (t) => {
+tryLoadTexture('assets/textures/pbr/bark_normal.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
     barkNormal = t;
     for (const m of trunkMeshes) {
         if (m.material) {
@@ -249,7 +249,7 @@ tryLoadTexture('assets/textures/pbr/bark_roughness.jpg', 'assets/textures/ball.p
     }
 });
 
-tryLoadTexture('assets/textures/pbr/leaf_albedo.png', 'assets/textures/ball.png', (t) => {
+tryLoadTexture('assets/textures/pbr/leaf_albedo.png', 'https://threejs.org/examples/textures/terrain/grasslight-big.jpg', (t) => {
     leafAlbedo = t;
     setTextureSRGB(leafAlbedo);
     for (const m of leafMeshes) {
@@ -274,7 +274,7 @@ tryLoadTexture('assets/textures/pbr/leaf_alpha.png', 'assets/textures/ball.png',
         }
     }
 });
-tryLoadTexture('assets/textures/pbr/leaf_normal.jpg', 'assets/textures/ball.png', (t) => {
+tryLoadTexture('assets/textures/pbr/leaf_normal.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
     leafNormal = t;
     for (const m of leafMeshes) {
         if (m.material) {
@@ -284,7 +284,7 @@ tryLoadTexture('assets/textures/pbr/leaf_normal.jpg', 'assets/textures/ball.png'
     }
 });
 
-tryLoadTexture('assets/textures/pbr/rock_color.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rock_01/rock_01_diff_1k.jpg', (t) => {
+tryLoadTexture('assets/textures/pbr/rock_color.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
     rockColor = t;
     setTextureSRGB(rockColor);
     // Avoid applying UV-grid placeholder textures (they contain numeric labels)
@@ -308,7 +308,7 @@ tryLoadTexture('assets/textures/pbr/rock_color.jpg', 'https://dl.polyhaven.org/f
         }
     }
 });
-tryLoadTexture('assets/textures/pbr/rock_normal.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rock_01/rock_01_nor_gl_1k.jpg', (t) => {
+tryLoadTexture('assets/textures/pbr/rock_normal.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
     rockNormal = t;
     for (const r of rockMeshes) {
         if (r.material) {
@@ -317,7 +317,7 @@ tryLoadTexture('assets/textures/pbr/rock_normal.jpg', 'https://dl.polyhaven.org/
         }
     }
 });
-tryLoadTexture('assets/textures/pbr/rock_roughness.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rock_01/rock_01_rough_1k.jpg', (t) => {
+tryLoadTexture('assets/textures/pbr/rock_roughness.jpg', 'assets/textures/ball.png', (t) => {
     rockRoughness = t;
     for (const r of rockMeshes) {
         if (r.material) {
@@ -336,7 +336,7 @@ tryLoadTexture('assets/textures/pbr/rock_roughness.jpg', 'https://dl.polyhaven.o
     }
 });
 
-tryLoadTexture('assets/textures/pbr/sand_color.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/sand_01/sand_01_diff_1k.jpg', (t) => {
+tryLoadTexture('assets/textures/pbr/sand_color.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
     sandColor = t;
     setTextureSRGB(sandColor);
     // apply to mountains with sand type
@@ -347,7 +347,7 @@ tryLoadTexture('assets/textures/pbr/sand_color.jpg', 'https://dl.polyhaven.org/f
         }
     }
 });
-tryLoadTexture('assets/textures/pbr/sand_normal.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/sand_01/sand_01_nor_gl_1k.jpg', (t) => {
+tryLoadTexture('assets/textures/pbr/sand_normal.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
     sandNormal = t;
     for (const m of mountainMeshes) {
         if (m.material && m.material.userData && m.material.userData.type === 'sand') {
@@ -356,7 +356,7 @@ tryLoadTexture('assets/textures/pbr/sand_normal.jpg', 'https://dl.polyhaven.org/
         }
     }
 });
-tryLoadTexture('assets/textures/pbr/sand_roughness.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/sand_01/sand_01_rough_1k.jpg', (t) => {
+tryLoadTexture('assets/textures/pbr/sand_roughness.jpg', 'assets/textures/ball.png', (t) => {
     sandRoughness = t;
     for (const m of mountainMeshes) {
         if (m.material && m.material.userData && m.material.userData.type === 'sand') {
@@ -367,7 +367,7 @@ tryLoadTexture('assets/textures/pbr/sand_roughness.jpg', 'https://dl.polyhaven.o
     }
 });
 
-tryLoadTexture('assets/textures/pbr/wood_color.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wood_01/wood_01_diff_1k.jpg', (t) => {
+tryLoadTexture('assets/textures/pbr/wood_color.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
     woodColor = t;
     setTextureSRGB(woodColor);
     // apply to doors
@@ -378,7 +378,7 @@ tryLoadTexture('assets/textures/pbr/wood_color.jpg', 'https://dl.polyhaven.org/f
         }
     }
 });
-tryLoadTexture('assets/textures/pbr/wood_normal.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wood_01/wood_01_nor_gl_1k.jpg', (t) => {
+tryLoadTexture('assets/textures/pbr/wood_normal.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
     woodNormal = t;
     for (const h of houses) {
         if (h.group && h.group.userData.door) {
@@ -387,7 +387,7 @@ tryLoadTexture('assets/textures/pbr/wood_normal.jpg', 'https://dl.polyhaven.org/
         }
     }
 });
-tryLoadTexture('assets/textures/pbr/wood_roughness.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wood_01/wood_01_rough_1k.jpg', (t) => {
+tryLoadTexture('assets/textures/pbr/wood_roughness.jpg', 'assets/textures/ball.png', (t) => {
     woodRoughness = t;
     for (const h of houses) {
         if (h.group && h.group.userData.door) {
@@ -398,7 +398,7 @@ tryLoadTexture('assets/textures/pbr/wood_roughness.jpg', 'https://dl.polyhaven.o
     }
 });
 
-tryLoadTexture('assets/textures/pbr/skin_color.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leather_01/leather_01_diff_1k.jpg', (t) => {
+tryLoadTexture('assets/textures/pbr/skin_color.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
     skinColor = t;
     setTextureSRGB(skinColor);
     // apply to hands
@@ -411,7 +411,7 @@ tryLoadTexture('assets/textures/pbr/skin_color.jpg', 'https://dl.polyhaven.org/f
         });
     }
 });
-tryLoadTexture('assets/textures/pbr/skin_normal.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leather_01/leather_01_nor_gl_1k.jpg', (t) => {
+tryLoadTexture('assets/textures/pbr/skin_normal.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
     skinNormal = t;
     if (playerGroup) {
         playerGroup.children.forEach(child => {
@@ -422,7 +422,7 @@ tryLoadTexture('assets/textures/pbr/skin_normal.jpg', 'https://dl.polyhaven.org/
         });
     }
 });
-tryLoadTexture('assets/textures/pbr/skin_roughness.jpg', 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leather_01/leather_01_rough_1k.jpg', (t) => {
+tryLoadTexture('assets/textures/pbr/skin_roughness.jpg', 'assets/textures/ball.png', (t) => {
     skinRoughness = t;
     if (playerGroup) {
         playerGroup.children.forEach(child => {
@@ -479,11 +479,11 @@ const water = new Water(
     {
         textureWidth: 512,
         textureHeight: 512,
-        clipBias: 0.003,
+        clipBias: 0.1,
         waterNormals: new THREE.TextureLoader().load('https://threejs.org/examples/textures/waternormals.jpg', function (texture) {
             texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
         }),
-        sunDirection: new THREE.Vector3(),
+        sunDirection: directionalLight.position.clone().normalize(),
         sunColor: 0xffffff,
         waterColor: 0x001e0f,
         distortionScale: 5.0,
@@ -869,19 +869,23 @@ function createMountains() {
 // Obstacles array for collision
 const obstacles = [];
 
-// Add multiple trees
+// Add multiple pine trees
 for (let i = 0; i < 20; i++) {
     const x = (Math.random() - 0.5) * 100;
     const z = (Math.random() - 0.5) * 100;
-    createTree(x, z);
-    obstacles.push({ x, z, radius: 5 }); // Approximate radius
+    const height = 8 + Math.random() * 12; // Varying height
+    const scale = 0.7 + Math.random() * 0.6; // Varying scale
+    createPineTree(x, z, height, scale);
+    obstacles.push({ x, z, radius: 3 }); // Approximate radius
 }
 
-// Add birch trees
+// Add more pine trees
 for (let i = 0; i < 15; i++) {
     const x = (Math.random() - 0.5) * 100;
     const z = (Math.random() - 0.5) * 100;
-    createBirchTree(x, z, 12 + Math.random() * 8, 0.8 + Math.random() * 0.4);
+    const height = 10 + Math.random() * 10; // Varying height
+    const scale = 0.6 + Math.random() * 0.5; // Varying scale
+    createPineTree(x, z, height, scale);
     obstacles.push({ x, z, radius: 3 });
 }
 
@@ -1037,12 +1041,12 @@ createClouds();
 function createBush(x, z) {
     // Build a bush from overlapping small spheres/leaf-clusters for more natural silhouette
     const bushGroup = new THREE.Group();
-    const pieces = 4 + Math.floor(Math.random() * 4);
+    const pieces = 6 + Math.floor(Math.random() * 6); // More pieces for denser bush
     for (let i = 0; i < pieces; i++) {
-        const size = 1.4 + Math.random() * 1.8;
-        const geo = new THREE.SphereGeometry(size, 10, 8);
+        const size = 0.8 + Math.random() * 1.2; // Smaller size
+        const geo = new THREE.SphereGeometry(size, 12, 10); // More segments for smoother shape
         const mat = new THREE.MeshStandardMaterial({
-            color: new THREE.Color(0x228B22).offsetHSL(0, 0, (Math.random() - 0.5) * 0.07),
+            color: new THREE.Color(0x228B22).offsetHSL(0, 0, (Math.random() - 0.5) * 0.1),
             roughness: 0.9,
             metalness: 0.0
         });
@@ -1061,13 +1065,71 @@ function createBush(x, z) {
             setTextureSRGB(leavesTex);
         }
         const m = new THREE.Mesh(geo, mat);
-        m.position.set((Math.random() - 0.5) * 1.6 + x, size * 0.5 + Math.random() * 0.6, (Math.random() - 0.5) * 1.6 + z);
+        m.position.set((Math.random() - 0.5) * 2.0 + x, size * 0.5 + Math.random() * 0.8, (Math.random() - 0.5) * 2.0 + z); // Larger spread
         m.castShadow = true;
         m.receiveShadow = true;
         bushGroup.add(m);
     }
     bushGroup.position.set(0, 0, 0);
     scene.add(bushGroup);
+}
+
+// Farmers
+const farmers = [];
+function createFarmer(x, z) {
+    const farmerGroup = new THREE.Group();
+
+    // Body (more blocky for Minecraft style)
+    const bodyGeo = new THREE.BoxGeometry(0.8, 1.2, 0.4);
+    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.set(0, 0.6, 0);
+    body.castShadow = true;
+    farmerGroup.add(body);
+
+    // Head (cube for Minecraft style)
+    const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+    const headMat = new THREE.MeshStandardMaterial({ color: 0xFDBCB4 });
+    const head = new THREE.Mesh(headGeo, headMat);
+    head.position.set(0, 1.4, 0);
+    head.castShadow = true;
+    farmerGroup.add(head);
+
+    // Arms (cylinders for simplicity, but thicker)
+    const armGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.8, 8);
+    const armMat = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+    const leftArm = new THREE.Mesh(armGeo, armMat);
+    leftArm.position.set(-0.5, 0.8, 0);
+    leftArm.castShadow = true;
+    farmerGroup.add(leftArm);
+    const rightArm = new THREE.Mesh(armGeo, armMat);
+    rightArm.position.set(0.5, 0.8, 0);
+    rightArm.castShadow = true;
+    farmerGroup.add(rightArm);
+
+    // Legs (cylinders)
+    const legGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.8, 8);
+    const legMat = new THREE.MeshLambertMaterial({ color: 0x654321 });
+    const leftLeg = new THREE.Mesh(legGeo, legMat);
+    leftLeg.position.set(-0.2, 0.4, 0);
+    leftLeg.castShadow = true;
+    farmerGroup.add(leftLeg);
+    const rightLeg = new THREE.Mesh(legGeo, legMat);
+    rightLeg.position.set(0.2, 0.4, 0);
+    rightLeg.castShadow = true;
+    farmerGroup.add(rightLeg);
+
+    // Add a hat for more character
+    const hatGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.2, 8);
+    const hatMat = new THREE.MeshLambertMaterial({ color: 0xFF0000 });
+    const hat = new THREE.Mesh(hatGeo, hatMat);
+    hat.position.set(0, 1.7, 0);
+    hat.castShadow = true;
+    farmerGroup.add(hat);
+
+    farmerGroup.position.set(x, 0, z);
+    scene.add(farmerGroup);
+    farmers.push({ group: farmerGroup, x, z, target: null, speed: 1 + Math.random() * 1 });
 }
 
 // Collectibles (fruits)
@@ -1085,6 +1147,33 @@ function createFruit(x, z) {
     collectibles.push(fruit);
 }
 
+// Crops for harvesting
+const crops = [];
+
+function createCrop(x, z) {
+    const cropGroup = new THREE.Group();
+
+    // Stem (blocky)
+    const stemGeo = new THREE.BoxGeometry(0.1, 1, 0.1);
+    const stemMat = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+    const stem = new THREE.Mesh(stemGeo, stemMat);
+    stem.position.set(0, 0.5, 0);
+    stem.castShadow = true;
+    cropGroup.add(stem);
+
+    // Crop top (cube for Minecraft style)
+    const cropGeo = new THREE.BoxGeometry(0.4, 0.4, 0.4);
+    const cropMat = new THREE.MeshLambertMaterial({ color: 0xFFD700 });
+    const crop = new THREE.Mesh(cropGeo, cropMat);
+    crop.position.set(0, 1.2, 0);
+    crop.castShadow = true;
+    cropGroup.add(crop);
+
+    cropGroup.position.set(x, 0, z);
+    scene.add(cropGroup);
+    crops.push({ group: cropGroup, x, z, harvested: false });
+}
+
 for (let i = 0; i < 15; i++) {
     const x = (Math.random() - 0.5) * 100;
     const z = (Math.random() - 0.5) * 100;
@@ -1097,6 +1186,20 @@ for (let i = 0; i < 10; i++) {
     const x = (Math.random() - 0.5) * 100;
     const z = (Math.random() - 0.5) * 100;
     createFruit(x, z);
+}
+
+// Add farmers
+for (let i = 0; i < 5; i++) {
+    const x = (Math.random() - 0.5) * 80;
+    const z = (Math.random() - 0.5) * 80;
+    createFarmer(x, z);
+}
+
+// Add crops
+for (let i = 0; i < 15; i++) {
+    const x = (Math.random() - 0.5) * 100;
+    const z = (Math.random() - 0.5) * 100;
+    createCrop(x, z);
 }
 
 // Player controls
@@ -1247,6 +1350,58 @@ function animate() {
         }
     }
 
+    // Farmer movement and harvesting
+    for (const farmer of farmers) {
+        if (!farmer.target || farmer.target.harvested) {
+            // Find nearest unharvested crop
+            let nearest = null;
+            let minDist = Infinity;
+            for (const crop of crops) {
+                if (!crop.harvested) {
+                    const dist = Math.hypot(farmer.x - crop.x, farmer.z - crop.z);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        nearest = crop;
+                    }
+                }
+            }
+            farmer.target = nearest;
+        }
+
+        if (farmer.target && !farmer.target.harvested) {
+            const dx = farmer.target.x - farmer.x;
+            const dz = farmer.target.z - farmer.z;
+            const dist = Math.sqrt(dx * dx + dz * dz);
+
+            if (dist > 0.5) {
+                // Move towards target
+                const moveX = (dx / dist) * farmer.speed * delta;
+                const moveZ = (dz / dist) * farmer.speed * delta;
+                farmer.x += moveX;
+                farmer.z += moveZ;
+                farmer.group.position.set(farmer.x, 0, farmer.z);
+
+                // Rotate to face direction
+                farmer.group.rotation.y = Math.atan2(dx, dz);
+            } else {
+                // Harvest
+                farmer.target.harvested = true;
+                farmer.target.group.visible = false; // Hide the crop
+                farmer.target = null;
+                // Do not add to main score, just play sound
+                playCollectSound(); // Reuse collect sound
+            }
+        } else {
+            // No target, move randomly
+            farmer.group.rotation.y += (Math.random() - 0.5) * 0.1;
+            const moveX = Math.cos(farmer.group.rotation.y) * farmer.speed * delta * 0.5;
+            const moveZ = Math.sin(farmer.group.rotation.y) * farmer.speed * delta * 0.5;
+            farmer.x += moveX;
+            farmer.z += moveZ;
+            farmer.group.position.set(farmer.x, 0, farmer.z);
+        }
+    }
+
     renderer.render(scene, camera);
 }
 
@@ -1346,9 +1501,13 @@ window.__GAME = {
     createHouse,
     createBush,
     createFruit,
+    createFarmer,
+    createCrop,
     collectibles,
     houses,
     obstacles,
+    farmers,
+    crops,
     ground,
     loader,
     tryLoadTexture,
@@ -1368,9 +1527,13 @@ export {
     createHouse,
     createBush,
     createFruit,
+    createFarmer,
+    createCrop,
     collectibles,
     houses,
     obstacles,
+    farmers,
+    crops,
     ground,
     loader,
     tryLoadTexture,
