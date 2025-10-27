@@ -132,6 +132,7 @@ let sandColor = null, sandNormal = null, sandRoughness = null;
 let woodColor = null, woodNormal = null, woodRoughness = null;
 let skinColor = null, skinNormal = null, skinRoughness = null;
 let brickColor = null, brickNormal = null, brickRoughness = null;
+let grassColor = null, grassNormal = null, grassRoughness = null;
 
 // Keep references to created meshes so we can apply textures after async load
 const trunkMeshes = [];
@@ -470,6 +471,22 @@ tryLoadTexture('assets/textures/pbr/brick_roughness.jpg', 'assets/textures/ball.
             m.needsUpdate = true;
         }
     }
+});
+
+tryLoadTexture('assets/textures/pbr/grass_color.jpg', 'https://threejs.org/examples/textures/terrain/grasslight-big.jpg', (t) => {
+    grassColor = t;
+    setTextureSRGB(grassColor);
+    try { grassColor.anisotropy = renderer.capabilities.getMaxAnisotropy(); } catch (e) {}
+    // Apply to existing bushes if any
+    // Since bushes are created later, handle in createBush
+});
+tryLoadTexture('assets/textures/pbr/grass_normal.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
+    grassNormal = t;
+    // Apply to existing bushes if any
+});
+tryLoadTexture('assets/textures/pbr/grass_roughness.jpg', 'assets/textures/ball.png', (t) => {
+    grassRoughness = t;
+    // Apply to existing bushes if any
 });
 
 const groundGeometry = new THREE.PlaneGeometry(200, 200);
@@ -1182,38 +1199,37 @@ function updateWeather(delta) {
 
 // Bushes
 function createBush(x, z) {
-    // Build a bush from overlapping small spheres/leaf-clusters for more natural silhouette
+    // Build a bush from multiple grass blades using planes for realistic shape
     const bushGroup = new THREE.Group();
-    const pieces = 6 + Math.floor(Math.random() * 6); // More pieces for denser bush
-    for (let i = 0; i < pieces; i++) {
-        const size = 0.8 + Math.random() * 1.2; // Smaller size
-        const geo = new THREE.SphereGeometry(size, 12, 10); // More segments for smoother shape
-        const mat = new THREE.MeshStandardMaterial({
-            color: new THREE.Color(0x228B22).offsetHSL(0, 0, (Math.random() - 0.5) * 0.1),
-            roughness: 0.9,
-            metalness: 0.0
-        });
-        // If leaf PBR/albedo available, use it for richer bushes
-        if (leafAlbedo) {
-            mat.map = leafAlbedo;
-            mat.transparent = true;
-            mat.alphaTest = 0.18;
-            mat.depthWrite = false;
-            setTextureSRGB(leafAlbedo);
-        } else if (leavesTex) {
-            mat.map = leavesTex;
-            mat.transparent = true;
-            mat.alphaTest = 0.18;
-            mat.depthWrite = false;
-            setTextureSRGB(leavesTex);
-        }
-        const m = new THREE.Mesh(geo, mat);
-        m.position.set((Math.random() - 0.5) * 2.0 + x, size * 0.5 + Math.random() * 0.8, (Math.random() - 0.5) * 2.0 + z); // Larger spread
-        m.castShadow = true;
-        m.receiveShadow = true;
-        bushGroup.add(m);
+    const bladeCount = 20 + Math.floor(Math.random() * 20); // More blades for denser bush
+    const bladeGeo = new THREE.PlaneGeometry(0.2, 1.0); // Width and height for grass blade
+    const bladeMat = new THREE.MeshStandardMaterial({
+        color: 0x228B22,
+        map: grassColor || leafAlbedo || leavesTex,
+        normalMap: grassNormal,
+        roughnessMap: grassRoughness,
+        roughness: 1.0,
+        transparent: true,
+        alphaTest: 0.5,
+        side: THREE.DoubleSide,
+        depthWrite: false
+    });
+    if (bladeMat.map) setTextureSRGB(bladeMat.map);
+
+    for (let i = 0; i < bladeCount; i++) {
+        const blade = new THREE.Mesh(bladeGeo, bladeMat);
+        // Position randomly within bush area
+        blade.position.set((Math.random() - 0.5) * 2.0, Math.random() * 1.0, (Math.random() - 0.5) * 2.0);
+        // Rotate randomly for natural look
+        blade.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+        // Scale slightly for variation
+        const scale = 0.5 + Math.random() * 0.5;
+        blade.scale.set(scale, scale, scale);
+        blade.castShadow = true;
+        blade.receiveShadow = true;
+        bushGroup.add(blade);
     }
-    bushGroup.position.set(0, 0, 0);
+    bushGroup.position.set(x, 0, z);
     scene.add(bushGroup);
 }
 
