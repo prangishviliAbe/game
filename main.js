@@ -1204,13 +1204,13 @@ function createBush(x, z) {
     const bladeCount = 20 + Math.floor(Math.random() * 20); // More blades for denser bush
     const bladeGeo = new THREE.PlaneGeometry(0.2, 1.0); // Width and height for grass blade
     const bladeMat = new THREE.MeshStandardMaterial({
-        color: 0x228B22,
+        color: 0x00ff00,
         map: leafAlbedo || leavesTex || grassColor,
         alphaMap: leafAlpha,
         normalMap: leafNormal || grassNormal,
         roughnessMap: grassRoughness,
         roughness: 1.0,
-        transparent: true,
+        transparent: !!leafAlpha,
         alphaTest: 0.3,
         side: THREE.DoubleSide,
         depthWrite: false
