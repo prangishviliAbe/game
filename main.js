@@ -292,7 +292,7 @@ tryLoadTexture('assets/textures/pbr/leaf_normal.jpg', 'https://threejs.org/examp
     }
 });
 
-tryLoadTexture('assets/textures/pbr/rock_color.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
+tryLoadTexture('assets/textures/pbr/rock_color.jpg', 'https://ambientcg.com/get?filename=Rock035_1K_Color.jpg', (t) => {
     rockColor = t;
     setTextureSRGB(rockColor);
     // Avoid applying UV-grid placeholder textures (they contain numeric labels)
@@ -316,7 +316,7 @@ tryLoadTexture('assets/textures/pbr/rock_color.jpg', 'https://threejs.org/exampl
         }
     }
 });
-tryLoadTexture('assets/textures/pbr/rock_normal.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
+tryLoadTexture('assets/textures/pbr/rock_normal.jpg', 'https://ambientcg.com/get?filename=Rock035_1K_Normal.jpg', (t) => {
     rockNormal = t;
     for (const r of rockMeshes) {
         if (r.material) {
@@ -325,7 +325,7 @@ tryLoadTexture('assets/textures/pbr/rock_normal.jpg', 'https://threejs.org/examp
         }
     }
 });
-tryLoadTexture('assets/textures/pbr/rock_roughness.jpg', 'assets/textures/ball.png', (t) => {
+tryLoadTexture('assets/textures/pbr/rock_roughness.jpg', 'https://ambientcg.com/get?filename=Rock035_1K_Roughness.jpg', (t) => {
     rockRoughness = t;
     for (const r of rockMeshes) {
         if (r.material) {
