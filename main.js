@@ -479,20 +479,21 @@ const water = new Water(
     {
         textureWidth: 512,
         textureHeight: 512,
-        clipBias: 0.1,
+        clipBias: 1.0, // Increased to reduce flickering
         waterNormals: new THREE.TextureLoader().load('https://threejs.org/examples/textures/waternormals.jpg', function (texture) {
             texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
         }),
         sunDirection: directionalLight.position.clone().normalize(),
         sunColor: 0xffffff,
         waterColor: 0x001e0f,
-        distortionScale: 5.0,
+        distortionScale: 20.0,
         waterTextureScale: 0.05,
+        side: THREE.DoubleSide,
         fog: scene.fog !== undefined
     }
 );
 water.rotation.x = - Math.PI / 2;
-water.position.set(0, 0, -100); // Position closer to the map
+water.position.set(0, -0.1, -100); // Below ground to prevent clipping with trees
 scene.add(water);
 
 // // Skybox
@@ -1337,7 +1338,7 @@ function animate() {
     }
 
     // update water animation uniform
-    water.material.uniforms['time'].value += 1.0 / 60.0;
+    water.material.uniforms['time'].value += 2.0 / 60.0;
     water.material.uniforms['sunDirection'].value.copy(directionalLight.position).normalize();
 
     // Animate house doors

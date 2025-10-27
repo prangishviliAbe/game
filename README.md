@@ -22,16 +22,19 @@ npx http-server -c-1 -p 8000
 Open http://127.0.0.1:8000 in your browser and press Start.
 
 Notes
+
 - Textures are stored in `assets/textures/pbr/` and were fetched from CC0 AmbientCG packs.
 - If you add or replace textures, refresh the page and clear cache (Ctrl+F5) to see changes.
 
 GitHub Pages demo
+
 - This repository includes a GitHub Actions workflow that publishes the repository root to GitHub Pages automatically on pushes to `main`.
 - Allow a minute or two after pushing for the Pages deployment to finish.
 
 License
+
 - The game code in this repository is provided under the MIT license. Check upstream texture licenses (AmbientCG) for usage rules (they are typically CC0/CC-BY).
-Jungle Adventure — local run instructions
+  Jungle Adventure — local run instructions
 
 How to run
 
