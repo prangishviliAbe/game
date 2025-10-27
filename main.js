@@ -1132,6 +1132,56 @@ function createFarmer(x, z) {
     farmers.push({ group: farmerGroup, x, z, target: null, speed: 1 + Math.random() * 1 });
 }
 
+// Ordinary people
+const people = [];
+function createPerson(x, z) {
+    const personGroup = new THREE.Group();
+
+    // Body
+    const bodyGeo = new THREE.BoxGeometry(0.6, 1.0, 0.3);
+    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x4169E1 }); // Blue shirt
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.set(0, 0.5, 0);
+    body.castShadow = true;
+    personGroup.add(body);
+
+    // Head
+    const headGeo = new THREE.BoxGeometry(0.4, 0.4, 0.4);
+    const headMat = new THREE.MeshStandardMaterial({ color: 0xFDBCB4 });
+    const head = new THREE.Mesh(headGeo, headMat);
+    head.position.set(0, 1.2, 0);
+    head.castShadow = true;
+    personGroup.add(head);
+
+    // Arms
+    const armGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.6, 8);
+    const armMat = new THREE.MeshLambertMaterial({ color: 0xFDBCB4 });
+    const leftArm = new THREE.Mesh(armGeo, armMat);
+    leftArm.position.set(-0.4, 0.7, 0);
+    leftArm.castShadow = true;
+    personGroup.add(leftArm);
+    const rightArm = new THREE.Mesh(armGeo, armMat);
+    rightArm.position.set(0.4, 0.7, 0);
+    rightArm.castShadow = true;
+    personGroup.add(rightArm);
+
+    // Legs
+    const legGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.7, 8);
+    const legMat = new THREE.MeshLambertMaterial({ color: 0x000080 }); // Dark blue pants
+    const leftLeg = new THREE.Mesh(legGeo, legMat);
+    leftLeg.position.set(-0.15, 0.35, 0);
+    leftLeg.castShadow = true;
+    personGroup.add(leftLeg);
+    const rightLeg = new THREE.Mesh(legGeo, legMat);
+    rightLeg.position.set(0.15, 0.35, 0);
+    rightLeg.castShadow = true;
+    personGroup.add(rightLeg);
+
+    personGroup.position.set(x, 0, z);
+    scene.add(personGroup);
+    people.push({ group: personGroup, x, z, speed: 0.5 + Math.random() * 0.5 });
+}
+
 // Collectibles (fruits)
 let score = 0;
 const collectibles = [];
@@ -1193,6 +1243,13 @@ for (let i = 0; i < 5; i++) {
     const x = (Math.random() - 0.5) * 80;
     const z = (Math.random() - 0.5) * 80;
     createFarmer(x, z);
+}
+
+// Add ordinary people
+for (let i = 0; i < 8; i++) {
+    const x = (Math.random() - 0.5) * 100;
+    const z = (Math.random() - 0.5) * 100;
+    createPerson(x, z);
 }
 
 // Add crops
@@ -1402,6 +1459,16 @@ function animate() {
         }
     }
 
+    // Ordinary people movement (random wandering)
+    for (const person of people) {
+        person.group.rotation.y += (Math.random() - 0.5) * 0.05;
+        const moveX = Math.cos(person.group.rotation.y) * person.speed * delta;
+        const moveZ = Math.sin(person.group.rotation.y) * person.speed * delta;
+        person.x += moveX;
+        person.z += moveZ;
+        person.group.position.set(person.x, 0, person.z);
+    }
+
     renderer.render(scene, camera);
 }
 
@@ -1503,11 +1570,13 @@ window.__GAME = {
     createFruit,
     createFarmer,
     createCrop,
+    createPerson,
     collectibles,
     houses,
     obstacles,
     farmers,
     crops,
+    people,
     ground,
     loader,
     tryLoadTexture,
@@ -1529,11 +1598,13 @@ export {
     createFruit,
     createFarmer,
     createCrop,
+    createPerson,
     collectibles,
     houses,
     obstacles,
     farmers,
     crops,
+    people,
     ground,
     loader,
     tryLoadTexture,
