@@ -1063,7 +1063,7 @@ createMountains();
 // Rocks
 function createRock(x, z) {
     // Create a low-poly rock with vertex perturbation for a more natural shape
-    const rockGeometry = new THREE.IcosahedronGeometry(2, 1);
+    const rockGeometry = new THREE.IcosahedronGeometry(0.5, 1); // Smaller size for realism
     // perturb vertices
     const pos = rockGeometry.attributes.position;
     for (let i = 0; i < pos.count; i++) {
@@ -1083,7 +1083,7 @@ function createRock(x, z) {
         roughness: rockRoughness ? 1.0 : 0.9
     });
     const rock = new THREE.Mesh(rockGeometry, rockMaterial);
-    rock.position.set(x, 1, z);
+    rock.position.set(x, 0.25, z); // Lower position for smaller rocks
     rock.castShadow = true;
     rock.receiveShadow = true;
     scene.add(rock);
