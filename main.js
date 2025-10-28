@@ -1426,8 +1426,8 @@ function addDuckAnimation(duckGroup) {
     duckGroup.userData.animate = (delta) => {
         animationTime += delta;
 
-        // Random direction changes
-        if (Math.random() < 0.01) {
+        // Random direction changes - more frequent
+        if (Math.random() < 0.02) {
             direction = Math.random() * Math.PI * 2;
             isSwimming = Math.random() < 0.6;
         }
@@ -1770,25 +1770,9 @@ function addHumanAnimation(humanGroup) {
         walkTime += delta;
         stateTimer += delta;
 
-        // State management
-        if (animationState === 'walking') {
-            if (stateTimer > 3 + Math.random() * 2) { // Walk for 3-5 seconds
-                animationState = Math.random() < 0.3 ? 'turning' : 'idle';
-                stateTimer = 0;
-            }
-        } else if (animationState === 'idle') {
-            idleTimer += delta;
-            if (idleTimer > 1 + Math.random() * 1) { // Idle for 1-2 seconds
-                animationState = 'walking';
-                idleTimer = 0;
-                stateTimer = 0;
-            }
-        } else if (animationState === 'turning') {
-            if (stateTimer > 0.5) { // Turn for 0.5 seconds
-                animationState = 'walking';
-                stateTimer = 0;
-            }
-        }
+        // State management - force continuous walking
+        animationState = 'walking';
+        stateTimer = 0;
 
         // Movement and direction - actually move the human
         if (animationState === 'walking') {
@@ -2135,7 +2119,7 @@ function animate() {
     // Update weather
     updateWeather(delta);
 
-    // Update animated humans and ducks
+    // Update animated humans and ducks - force them to always move
     for (const character of animatedHumans) {
         if (character.userData && character.userData.animate) {
             character.userData.animate(delta);
