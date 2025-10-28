@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { Water } from 'three/addons/objects/Water.js';
 import { Sky } from './scripts/Sky.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const gltfLoader = new GLTFLoader();
 
 // Scene setup
 const scene = new THREE.Scene();
@@ -14,34 +17,49 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1; // Enhanced exposure for realistic look
+renderer.outputColorSpace = THREE.SRGBColorSpace; // Proper color space
+renderer.physicallyCorrectLights = true; // Physically based lighting
 
-// Lighting
-const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+// Enhanced lighting system for realistic rendering
+const ambientLight = new THREE.AmbientLight(0x404040, 0.4); // Reduced ambient for more contrast
 scene.add(ambientLight);
 
-// Sun (warm directional light) with sharper shadows
-const directionalLight = new THREE.DirectionalLight(0xfff1c1, 1.0);
+// Primary sun light with realistic properties
+const directionalLight = new THREE.DirectionalLight(0xfff1c1, 1.2);
 directionalLight.position.set(80, 120, 50);
 directionalLight.castShadow = true;
-// Increase shadow map size for crisper shadows
-directionalLight.shadow.mapSize.width = 4096;
-directionalLight.shadow.mapSize.height = 4096;
-// Configure shadow camera (orthographic) to cover the play area
-const d = 120;
-directionalLight.shadow.camera.left = -d;
-directionalLight.shadow.camera.right = d;
-directionalLight.shadow.camera.top = d;
-directionalLight.shadow.camera.bottom = -d;
+// High-quality shadow mapping
+directionalLight.shadow.mapSize.width = 8192;
+directionalLight.shadow.mapSize.height = 8192;
 directionalLight.shadow.camera.near = 0.5;
-directionalLight.shadow.camera.far = 400;
-directionalLight.shadow.bias = -0.0005;
-// radius softening (supported in some browsers / drivers)
-if ('radius' in directionalLight.shadow) directionalLight.shadow.radius = 4;
+directionalLight.shadow.camera.far = 500;
+directionalLight.shadow.camera.left = -150;
+directionalLight.shadow.camera.right = 150;
+directionalLight.shadow.camera.top = 150;
+directionalLight.shadow.camera.bottom = -150;
+directionalLight.shadow.bias = -0.0001;
+directionalLight.shadow.normalBias = 0.02;
+// Soft shadows
+if ('radius' in directionalLight.shadow) directionalLight.shadow.radius = 8;
 scene.add(directionalLight);
 
-// Hemisphere fill for ambient blue sky and warm ground bounce
-const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x444444, 0.5);
+// Fill light from the opposite side for more natural illumination
+const fillLight = new THREE.DirectionalLight(0x87CEEB, 0.3);
+fillLight.position.set(-50, 80, -30);
+fillLight.castShadow = false; // No shadows from fill light
+scene.add(fillLight);
+
+// Hemisphere light for sky/ground color bounce
+const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x8B7355, 0.6); // Sky blue to warm ground
+hemiLight.position.set(0, 100, 0);
 scene.add(hemiLight);
+
+// Additional rim lighting for depth
+const rimLight = new THREE.DirectionalLight(0xffffff, 0.2);
+rimLight.position.set(0, 50, -100);
+rimLight.castShadow = false;
+scene.add(rimLight);
 
 // Realistic sun
 const sunGeometry = new THREE.SphereGeometry(10, 16, 16);
@@ -59,45 +77,20 @@ body.position.set(0, 1, 0);
 body.castShadow = true;
 playerGroup.add(body);
 
-// Add arms
-const armGeo = new THREE.CylinderGeometry(0.15, 0.15, 1.0);
-const armMat = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
-const leftArm = new THREE.Mesh(armGeo, armMat);
-leftArm.position.set(-0.5, 1.0, 0);
-leftArm.castShadow = true;
-playerGroup.add(leftArm);
-const rightArm = new THREE.Mesh(armGeo, armMat);
-rightArm.position.set(0.5, 1.0, 0);
-rightArm.castShadow = true;
-playerGroup.add(rightArm);
-
-// Add hands
-const handGeo = new THREE.SphereGeometry(0.3);
-const handMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
-const leftHand = new THREE.Mesh(handGeo, handMat);
-leftHand.position.set(-0.5, 0.5, 0);
-leftHand.castShadow = true;
-playerGroup.add(leftHand);
-const rightHand = new THREE.Mesh(handGeo, handMat);
-rightHand.position.set(0.5, 0.5, 0);
-rightHand.castShadow = true;
-playerGroup.add(rightHand);
-
-// Add stick in right hand
-const stickGeo = new THREE.CylinderGeometry(0.03, 0.03, 1.0);
-const stickMat = new THREE.MeshStandardMaterial({ color: 0x654321 });
-const stick = new THREE.Mesh(stickGeo, stickMat);
-stick.position.set(0.5, 0.5, 0.2);
-stick.rotation.z = -0.7; // tilt for holding
-stick.castShadow = true;
-playerGroup.add(stick);
-
 scene.add(playerGroup);
 
 // Camera / controls setup (we use pointer lock for immersive adventure)
 camera.position.set(0, 2, 0); // camera height relative to player
 const controls = new PointerLockControls(camera, renderer.domElement);
 // We won't add the control object to the scene (camera is enough). The player mesh remains visible and will be synced to camera.
+
+// Audio will be created on user gesture (when game starts) to satisfy browser autoplay policies
+let audioContext = null;
+
+function initAudio() {
+    if (audioContext) return;
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+}
 
 // Start screen / pointer lock hookup
 const startScreen = document.getElementById('start-screen');
@@ -140,6 +133,8 @@ const leafMeshes = [];
 const rockMeshes = [];
 const mountainMeshes = [];
 const wallMaterials = [];
+const animatedHumans = [];
+const mixers = [];
 
 // Helper: try local asset first, then fall back to CDN URL
 function tryLoadTexture(localPath, cdnUrl, onLoad) {
@@ -237,6 +232,8 @@ tryLoadTexture('assets/textures/pbr/bark_color.jpg', 'https://threejs.org/exampl
         }
     }
 });
+
+// Load additional textures for enhanced realism (removed duplicate loading)
 tryLoadTexture('assets/textures/pbr/bark_normal.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
     barkNormal = t;
     for (const m of trunkMeshes) {
@@ -344,104 +341,8 @@ tryLoadTexture('assets/textures/pbr/rock_roughness.jpg', 'https://ambientcg.com/
     }
 });
 
-tryLoadTexture('assets/textures/pbr/sand_color.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
-    sandColor = t;
-    setTextureSRGB(sandColor);
-    // apply to mountains with sand type
-    for (const m of mountainMeshes) {
-        if (m.material && m.material.userData && m.material.userData.type === 'sand') {
-            m.material.map = sandColor;
-            m.material.needsUpdate = true;
-        }
-    }
-});
-tryLoadTexture('assets/textures/pbr/sand_normal.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
-    sandNormal = t;
-    for (const m of mountainMeshes) {
-        if (m.material && m.material.userData && m.material.userData.type === 'sand') {
-            m.material.normalMap = sandNormal;
-            m.material.needsUpdate = true;
-        }
-    }
-});
-tryLoadTexture('assets/textures/pbr/sand_roughness.jpg', 'assets/textures/ball.png', (t) => {
-    sandRoughness = t;
-    for (const m of mountainMeshes) {
-        if (m.material && m.material.userData && m.material.userData.type === 'sand') {
-            m.material.roughnessMap = sandRoughness;
-            m.material.roughness = 1.0;
-            m.material.needsUpdate = true;
-        }
-    }
-});
 
-tryLoadTexture('assets/textures/pbr/wood_color.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
-    woodColor = t;
-    setTextureSRGB(woodColor);
-    // apply to doors
-    for (const h of houses) {
-        if (h.group && h.group.userData.door) {
-            h.group.userData.door.material.map = woodColor;
-            h.group.userData.door.material.needsUpdate = true;
-        }
-    }
-});
-tryLoadTexture('assets/textures/pbr/wood_normal.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
-    woodNormal = t;
-    for (const h of houses) {
-        if (h.group && h.group.userData.door) {
-            h.group.userData.door.material.normalMap = woodNormal;
-            h.group.userData.door.material.needsUpdate = true;
-        }
-    }
-});
-tryLoadTexture('assets/textures/pbr/wood_roughness.jpg', 'assets/textures/ball.png', (t) => {
-    woodRoughness = t;
-    for (const h of houses) {
-        if (h.group && h.group.userData.door) {
-            h.group.userData.door.material.roughnessMap = woodRoughness;
-            h.group.userData.door.material.roughness = 1.0;
-            h.group.userData.door.material.needsUpdate = true;
-        }
-    }
-});
 
-tryLoadTexture('assets/textures/pbr/skin_color.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
-    skinColor = t;
-    setTextureSRGB(skinColor);
-    // apply to hands
-    if (playerGroup) {
-        playerGroup.children.forEach(child => {
-            if (child.geometry.type === 'SphereGeometry') { // hands
-                child.material.map = skinColor;
-                child.material.needsUpdate = true;
-            }
-        });
-    }
-});
-tryLoadTexture('assets/textures/pbr/skin_normal.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
-    skinNormal = t;
-    if (playerGroup) {
-        playerGroup.children.forEach(child => {
-            if (child.geometry.type === 'SphereGeometry') {
-                child.material.normalMap = skinNormal;
-                child.material.needsUpdate = true;
-            }
-        });
-    }
-});
-tryLoadTexture('assets/textures/pbr/skin_roughness.jpg', 'assets/textures/ball.png', (t) => {
-    skinRoughness = t;
-    if (playerGroup) {
-        playerGroup.children.forEach(child => {
-            if (child.geometry.type === 'SphereGeometry') {
-                child.material.roughnessMap = skinRoughness;
-                child.material.roughness = 1.0;
-                child.material.needsUpdate = true;
-            }
-        });
-    }
-});
 
 tryLoadTexture('assets/textures/pbr/brick_color.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (t) => {
     brickColor = t;
@@ -496,31 +397,50 @@ ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-// Water as a river with banks
+// Enhanced water with realistic reflections and materials
 const riverWidth = 8;
 const riverLength = 300;
-const waterGeometry = new THREE.PlaneGeometry(riverWidth, riverLength, 10, 10); // More segments for smoothness
+const waterGeometry = new THREE.PlaneGeometry(riverWidth, riverLength, 32, 32); // Higher resolution
+
+// Create water with advanced properties
 const water = new Water(
     waterGeometry,
     {
-        textureWidth: 512,
-        textureHeight: 512,
-        clipBias: 2.0, // Increased to reduce flickering
+        textureWidth: 1024,
+        textureHeight: 1024,
+        clipBias: 0.0,
         waterNormals: new THREE.TextureLoader().load('https://threejs.org/examples/textures/waternormals.jpg', function (texture) {
             texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+            texture.minFilter = THREE.LinearMipMapLinearFilter;
         }),
         sunDirection: directionalLight.position.clone().normalize(),
-        sunColor: 0xffffff,
-        waterColor: 0x001e0f,
-        distortionScale: 20.0,
-        waterTextureScale: 0.05,
+        sunColor: 0xfff1c1,
+        waterColor: 0x006994, // More realistic water color
+        distortionScale: 8.0,
+        waterTextureScale: 0.08,
         side: THREE.DoubleSide,
-        fog: scene.fog !== undefined
+        fog: scene.fog !== undefined,
+        // Enhanced reflection properties
+        reflectivity: 0.8,
+        alpha: 0.9
     }
 );
 water.rotation.x = - Math.PI / 2;
-water.position.set(0, 0.01, -100); // Slightly above ground to prevent z-fighting
+water.position.set(0, 0.02, -100); // Slightly above ground
 scene.add(water);
+
+// Add water caustics effect
+const causticsGeometry = new THREE.PlaneGeometry(riverWidth * 1.2, riverLength * 1.2, 16, 16);
+const causticsMaterial = new THREE.MeshBasicMaterial({
+    color: 0x004477,
+    transparent: true,
+    opacity: 0.1,
+    side: THREE.DoubleSide
+});
+const caustics = new THREE.Mesh(causticsGeometry, causticsMaterial);
+caustics.rotation.x = - Math.PI / 2;
+caustics.position.set(0, 0.01, -100);
+scene.add(caustics);
 
 // Add banks around the river
 const bankHeight = 0.5;
@@ -1234,113 +1154,762 @@ function createBush(x, z) {
     scene.add(bushGroup);
 }
 
-// Farmers
-const farmers = [];
-function createFarmer(x, z) {
-    const farmerGroup = new THREE.Group();
+function createAnimatedHuman(x, z) {
+    // Load high-quality human model from Khronos Group sample models
+    loadGLTFModel('assets/models/cesium_man.glb', (gltf) => {
+        const model = gltf.scene;
+        model.position.set(x, 0, z);
+        model.scale.set(1.7, 1.7, 1.7); // Slightly smaller human height
+        model.traverse(function (object) {
+            if (object.isMesh) {
+                object.castShadow = true;
+                object.receiveShadow = true;
+                // Apply realistic human material properties
+                if (object.material) {
+                    object.material.roughness = 0.8;
+                    object.material.metalness = 0.0;
+                    // The CesiumMan model already has embedded textures
+                    object.material.needsUpdate = true;
+                }
+            }
+        });
+        scene.add(model);
+        animatedHumans.push(model);
+        obstacles.push({ x, z, radius: 1 });
 
-    // Body (more blocky for Minecraft style)
-    const bodyGeo = new THREE.BoxGeometry(0.8, 1.2, 0.4);
-    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.position.set(0, 0.6, 0);
-    body.castShadow = true;
-    farmerGroup.add(body);
-
-    // Head (cube for Minecraft style)
-    const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-    const headMat = new THREE.MeshStandardMaterial({ color: 0xFDBCB4 });
-    const head = new THREE.Mesh(headGeo, headMat);
-    head.position.set(0, 1.4, 0);
-    head.castShadow = true;
-    farmerGroup.add(head);
-
-    // Arms (cylinders for simplicity, but thicker)
-    const armGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.8, 8);
-    const armMat = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
-    const leftArm = new THREE.Mesh(armGeo, armMat);
-    leftArm.position.set(-0.5, 0.8, 0);
-    leftArm.castShadow = true;
-    farmerGroup.add(leftArm);
-    const rightArm = new THREE.Mesh(armGeo, armMat);
-    rightArm.position.set(0.5, 0.8, 0);
-    rightArm.castShadow = true;
-    farmerGroup.add(rightArm);
-
-    // Legs (cylinders)
-    const legGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.8, 8);
-    const legMat = new THREE.MeshLambertMaterial({ color: 0x654321 });
-    const leftLeg = new THREE.Mesh(legGeo, legMat);
-    leftLeg.position.set(-0.2, 0.4, 0);
-    leftLeg.castShadow = true;
-    farmerGroup.add(leftLeg);
-    const rightLeg = new THREE.Mesh(legGeo, legMat);
-    rightLeg.position.set(0.2, 0.4, 0);
-    rightLeg.castShadow = true;
-    farmerGroup.add(rightLeg);
-
-    // Add a hat for more character
-    const hatGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.2, 8);
-    const hatMat = new THREE.MeshLambertMaterial({ color: 0xFF0000 });
-    const hat = new THREE.Mesh(hatGeo, hatMat);
-    hat.position.set(0, 1.7, 0);
-    hat.castShadow = true;
-    farmerGroup.add(hat);
-
-    farmerGroup.position.set(x, 0, z);
-    scene.add(farmerGroup);
-    farmers.push({ group: farmerGroup, x, z, target: null, speed: 1 + Math.random() * 1 });
+        // The CesiumMan model has embedded animations - try to play them
+        const mixer = new THREE.AnimationMixer(model);
+        if (gltf.animations && gltf.animations.length > 0) {
+            const action = mixer.clipAction(gltf.animations[0]);
+            action.play();
+        }
+        mixers.push(mixer);
+    }, (error) => {
+        console.warn('Failed to load high-quality human model, falling back to custom:', error);
+        createCustomHuman(x, z);
+    });
 }
 
-// Ordinary people
-const people = [];
-function createPerson(x, z) {
-    const personGroup = new THREE.Group();
+function createRealisticDuck(x, z) {
+    // Load high-quality duck model from Khronos Group sample models
+    loadGLTFModel('assets/models/duck.glb', (gltf) => {
+        const model = gltf.scene;
+        model.position.set(x, 0, z);
+        model.scale.set(0.4, 0.4, 0.4); // Smaller size as requested
+        model.traverse(function (object) {
+            if (object.isMesh) {
+                object.castShadow = true;
+                object.receiveShadow = true;
+                // Apply realistic duck material properties
+                if (object.material) {
+                    object.material.roughness = 0.6;
+                    object.material.metalness = 0.0;
+                    // Make it more yellow if possible
+                    if (object.material.color) {
+                        object.material.color.setHex(0xFFFF00); // Bright yellow
+                    }
+                    object.material.needsUpdate = true;
+                }
+            }
+        });
+        scene.add(model);
+        animatedHumans.push(model); // Reuse the array for ducks too
+        obstacles.push({ x, z, radius: 0.8 });
 
-    // Body
-    const bodyGeo = new THREE.BoxGeometry(0.6, 1.0, 0.3);
-    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x4169E1 }); // Blue shirt
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.position.set(0, 0.5, 0);
-    body.castShadow = true;
-    personGroup.add(body);
-
-    // Head
-    const headGeo = new THREE.BoxGeometry(0.4, 0.4, 0.4);
-    const headMat = new THREE.MeshStandardMaterial({ color: 0xFDBCB4 });
-    const head = new THREE.Mesh(headGeo, headMat);
-    head.position.set(0, 1.2, 0);
-    head.castShadow = true;
-    personGroup.add(head);
-
-    // Arms
-    const armGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.6, 8);
-    const armMat = new THREE.MeshLambertMaterial({ color: 0xFDBCB4 });
-    const leftArm = new THREE.Mesh(armGeo, armMat);
-    leftArm.position.set(-0.4, 0.7, 0);
-    leftArm.castShadow = true;
-    personGroup.add(leftArm);
-    const rightArm = new THREE.Mesh(armGeo, armMat);
-    rightArm.position.set(0.4, 0.7, 0);
-    rightArm.castShadow = true;
-    personGroup.add(rightArm);
-
-    // Legs
-    const legGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.7, 8);
-    const legMat = new THREE.MeshLambertMaterial({ color: 0x000080 }); // Dark blue pants
-    const leftLeg = new THREE.Mesh(legGeo, legMat);
-    leftLeg.position.set(-0.15, 0.35, 0);
-    leftLeg.castShadow = true;
-    personGroup.add(leftLeg);
-    const rightLeg = new THREE.Mesh(legGeo, legMat);
-    rightLeg.position.set(0.15, 0.35, 0);
-    rightLeg.castShadow = true;
-    personGroup.add(rightLeg);
-
-    personGroup.position.set(x, 0, z);
-    scene.add(personGroup);
-    people.push({ group: personGroup, x, z, speed: 0.5 + Math.random() * 0.5 });
+        // The Khronos Duck model has embedded animations - try to play them
+        const mixer = new THREE.AnimationMixer(model);
+        if (gltf.animations && gltf.animations.length > 0) {
+            const action = mixer.clipAction(gltf.animations[0]);
+            action.play();
+        }
+        mixers.push(mixer);
+    }, (error) => {
+        console.warn('Failed to load high-quality duck model, falling back to custom:', error);
+        createCustomDuck(x, z);
+    });
 }
+
+function createCustomDuck(x, z) {
+    // Create a highly detailed, realistic yellow duck
+    const duckGroup = new THREE.Group();
+
+    // Body - more realistic duck shape
+    const bodyGeometry = new THREE.SphereGeometry(0.28, 20, 16);
+    bodyGeometry.scale(1.1, 0.75, 1.3); // Proper duck proportions
+    const bodyMaterial = new THREE.MeshStandardMaterial({
+        color: 0xFFFF00, // Bright yellow body
+        roughness: 0.6,
+        metalness: 0.0
+    });
+
+    // Try to load realistic duck texture
+    tryLoadTexture('https://threejs.org/examples/textures/terrain/grasslight-big.jpg', 'https://threejs.org/examples/textures/terrain/grasslight-big.jpg', (texture) => {
+        bodyMaterial.map = texture;
+        setTextureSRGB(texture);
+        bodyMaterial.needsUpdate = true;
+    });
+
+    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+    body.position.set(0, 0.18, 0);
+    body.castShadow = true;
+    body.receiveShadow = true;
+    duckGroup.add(body);
+
+    // Head - more rounded and proportional
+    const headGeometry = new THREE.SphereGeometry(0.2, 16, 12);
+    const headMaterial = new THREE.MeshStandardMaterial({
+        color: 0xFFFF00, // Yellow head
+        roughness: 0.5,
+        metalness: 0.0
+    });
+    const head = new THREE.Mesh(headGeometry, headMaterial);
+    head.position.set(0, 0.5, 0.25);
+    head.castShadow = true;
+    head.receiveShadow = true;
+    duckGroup.add(head);
+
+    // Beak - more detailed
+    const beakGeometry = new THREE.ConeGeometry(0.06, 0.2, 8);
+    const beakMaterial = new THREE.MeshStandardMaterial({
+        color: 0xFFA500, // Orange beak
+        roughness: 0.8,
+        metalness: 0.0
+    });
+    const beak = new THREE.Mesh(beakGeometry, beakMaterial);
+    beak.position.set(0, 0.45, 0.4);
+    beak.rotation.x = Math.PI / 2;
+    beak.castShadow = true;
+    duckGroup.add(beak);
+
+    // Eyes - more prominent
+    const eyeGeometry = new THREE.SphereGeometry(0.03, 8, 6);
+    const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+
+    const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+    leftEye.position.set(-0.07, 0.53, 0.3);
+    duckGroup.add(leftEye);
+
+    const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+    rightEye.position.set(0.07, 0.53, 0.3);
+    duckGroup.add(rightEye);
+
+    // Eye highlights
+    const highlightGeometry = new THREE.SphereGeometry(0.01, 6, 4);
+    const highlightMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+    const leftHighlight = new THREE.Mesh(highlightGeometry, highlightMaterial);
+    leftHighlight.position.set(-0.065, 0.535, 0.32);
+    duckGroup.add(leftHighlight);
+
+    const rightHighlight = new THREE.Mesh(highlightGeometry, highlightMaterial);
+    rightHighlight.position.set(0.065, 0.535, 0.32);
+    duckGroup.add(rightHighlight);
+
+    // Wings - more detailed
+    const wingGeometry = new THREE.BoxGeometry(0.18, 0.06, 0.4);
+    wingGeometry.scale(1, 1, 0.8); // Taper the wings
+    const wingMaterial = new THREE.MeshStandardMaterial({
+        color: 0xFFFF88, // Slightly lighter yellow for wings
+        roughness: 0.7,
+        metalness: 0.0
+    });
+
+    const leftWing = new THREE.Mesh(wingGeometry, wingMaterial);
+    leftWing.position.set(-0.28, 0.22, 0);
+    leftWing.castShadow = true;
+    leftWing.receiveShadow = true;
+    duckGroup.add(leftWing);
+
+    const rightWing = new THREE.Mesh(wingGeometry, wingMaterial);
+    rightWing.position.set(0.28, 0.22, 0);
+    rightWing.castShadow = true;
+    rightWing.receiveShadow = true;
+    duckGroup.add(rightWing);
+
+    // Legs - more realistic
+    const legGeometry = new THREE.CylinderGeometry(0.025, 0.025, 0.25, 8);
+    const legMaterial = new THREE.MeshStandardMaterial({
+        color: 0xFFA500, // Orange legs
+        roughness: 0.9,
+        metalness: 0.0
+    });
+
+    const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+    leftLeg.position.set(-0.15, -0.08, 0.12);
+    leftLeg.castShadow = true;
+    duckGroup.add(leftLeg);
+
+    const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+    rightLeg.position.set(0.15, -0.08, 0.12);
+    rightLeg.castShadow = true;
+    duckGroup.add(rightLeg);
+
+    // Feet (webbed) - more detailed
+    const footGeometry = new THREE.BoxGeometry(0.1, 0.015, 0.15);
+    const footMaterial = new THREE.MeshStandardMaterial({
+        color: 0xFFA500,
+        roughness: 0.9,
+        metalness: 0.0
+    });
+
+    const leftFoot = new THREE.Mesh(footGeometry, footMaterial);
+    leftFoot.position.set(-0.15, -0.18, 0.18);
+    leftFoot.castShadow = true;
+    duckGroup.add(leftFoot);
+
+    const rightFoot = new THREE.Mesh(footGeometry, footMaterial);
+    rightFoot.position.set(0.15, -0.18, 0.18);
+    rightFoot.castShadow = true;
+    duckGroup.add(rightFoot);
+
+    // Tail - more prominent
+    const tailGeometry = new THREE.ConeGeometry(0.1, 0.2, 8);
+    const tailMaterial = new THREE.MeshStandardMaterial({
+        color: 0xFFFF00,
+        roughness: 0.7,
+        metalness: 0.0
+    });
+    const tail = new THREE.Mesh(tailGeometry, tailMaterial);
+    tail.position.set(0, 0.18, -0.3);
+    tail.rotation.x = -Math.PI / 4;
+    tail.castShadow = true;
+    duckGroup.add(tail);
+
+    // Position the duck
+    duckGroup.position.set(x, 0, z);
+
+    // Scale down the custom duck
+    duckGroup.scale.set(0.5, 0.5, 0.5); // Smaller size
+
+    // Add duck animation
+    addDuckAnimation(duckGroup);
+
+    scene.add(duckGroup);
+    animatedHumans.push(duckGroup); // Reuse the array
+    obstacles.push({ x, z, radius: 0.4 }); // Smaller radius for smaller duck
+}
+
+function addDuckAnimation(duckGroup) {
+    let animationTime = 0;
+    const swimSpeed = 1.2;
+    const walkSpeed = 0.8;
+    const duckMoveSpeed = 1.0;
+    let direction = Math.random() * Math.PI * 2;
+    let isSwimming = Math.random() < 0.6; // 60% chance of swimming
+
+    // Get references to body parts (for loaded GLTF model)
+    let body, head, leftWing, rightWing, leftLeg, rightLeg;
+
+    if (duckGroup.children && duckGroup.children.length > 0) {
+        // For loaded GLTF model, find parts by name or traverse
+        duckGroup.traverse((child) => {
+            if (child.isMesh) {
+                if (child.name.toLowerCase().includes('body') || child.geometry.type === 'SphereGeometry') {
+                    body = child;
+                } else if (child.name.toLowerCase().includes('head') || (child.geometry.type === 'SphereGeometry' && child.position.y > 0.4)) {
+                    head = child;
+                } else if (child.name.toLowerCase().includes('wing') && child.position.x < -0.2) {
+                    leftWing = child;
+                } else if (child.name.toLowerCase().includes('wing') && child.position.x > 0.2) {
+                    rightWing = child;
+                } else if (child.name.toLowerCase().includes('leg') && child.position.x < -0.1) {
+                    leftLeg = child;
+                } else if (child.name.toLowerCase().includes('leg') && child.position.x > 0.1) {
+                    rightLeg = child;
+                }
+            }
+        });
+    }
+
+    // Store the animation function to be called from main loop
+    duckGroup.userData = duckGroup.userData || {};
+    duckGroup.userData.animate = (delta) => {
+        animationTime += delta;
+
+        // Random direction changes
+        if (Math.random() < 0.004) {
+            direction = Math.random() * Math.PI * 2;
+            isSwimming = Math.random() < 0.6;
+        }
+
+        // Movement - actually move the duck
+        const currentSpeed = isSwimming ? duckMoveSpeed * 1.5 : duckMoveSpeed;
+        const moveX = Math.cos(direction) * currentSpeed * delta;
+        const moveZ = Math.sin(direction) * currentSpeed * delta;
+
+        const newX = duckGroup.position.x + moveX;
+        const newZ = duckGroup.position.z + moveZ;
+
+        // Boundary check
+        if (Math.abs(newX) > 90 || Math.abs(newZ) > 90) {
+            direction = Math.random() * Math.PI * 2;
+        } else {
+            duckGroup.position.x = newX;
+            duckGroup.position.z = newZ;
+        }
+
+        duckGroup.rotation.y = direction;
+
+        // Update obstacle position for collision detection
+        const obstacleIndex = obstacles.findIndex(obs => Math.abs(obs.x - duckGroup.position.x) < 0.1 && Math.abs(obs.z - duckGroup.position.z) < 0.1);
+        if (obstacleIndex !== -1) {
+            obstacles[obstacleIndex].x = newX;
+            obstacles[obstacleIndex].z = newZ;
+        }
+
+        if (isSwimming) {
+            // Swimming animation - subtle bobbing
+            const bob = Math.sin(animationTime * swimSpeed) * 0.02;
+            duckGroup.position.y = bob;
+
+            // Wing flapping for swimming
+            if (leftWing) leftWing.rotation.z = Math.sin(animationTime * swimSpeed * 2) * 0.3;
+            if (rightWing) rightWing.rotation.z = -Math.sin(animationTime * swimSpeed * 2) * 0.3;
+
+            // Legs tucked in while swimming
+            if (leftLeg) leftLeg.visible = false;
+            if (rightLeg) rightLeg.visible = false;
+        } else {
+            // Walking animation
+            const bob = Math.sin(animationTime * walkSpeed) * 0.015;
+            duckGroup.position.y = bob;
+
+            // Wing subtle movement
+            if (leftWing) leftWing.rotation.z = Math.sin(animationTime * walkSpeed) * 0.1;
+            if (rightWing) rightWing.rotation.z = -Math.sin(animationTime * walkSpeed) * 0.1;
+
+            // Legs visible and moving while walking
+            if (leftLeg) {
+                leftLeg.visible = true;
+                leftLeg.rotation.x = Math.sin(animationTime * walkSpeed) * 0.2;
+            }
+            if (rightLeg) {
+                rightLeg.visible = true;
+                rightLeg.rotation.x = -Math.sin(animationTime * walkSpeed) * 0.2;
+            }
+        }
+
+        // Head bobbing
+        if (head) head.position.y = 0.45 + Math.sin(animationTime * 3) * 0.005;
+    };
+}
+
+function createCustomHuman(x, z) {
+    // Create a highly detailed, realistic human figure with proper anatomy
+    const humanGroup = new THREE.Group();
+
+    // Torso - more anatomically correct
+    const torsoGeometry = new THREE.CapsuleGeometry(0.32, 0.85, 12, 20);
+    const torsoMaterial = new THREE.MeshStandardMaterial({
+        color: 0x4a90e2, // Blue shirt
+        roughness: 0.7,
+        metalness: 0.0
+    });
+
+    // Try to load clothing texture
+    tryLoadTexture('https://threejs.org/examples/textures/brick_diffuse.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (texture) => {
+        torsoMaterial.map = texture;
+        setTextureSRGB(texture);
+        torsoMaterial.needsUpdate = true;
+    });
+
+    const torso = new THREE.Mesh(torsoGeometry, torsoMaterial);
+    torso.position.set(0, 0.42, 0);
+    torso.castShadow = true;
+    torso.receiveShadow = true;
+    humanGroup.add(torso);
+
+    // Head - anatomically correct proportions
+    const headGeometry = new THREE.SphereGeometry(0.21, 20, 16);
+    headGeometry.scale(0.95, 1.1, 0.9); // Slightly oval shape
+    const headMaterial = new THREE.MeshStandardMaterial({
+        color: 0xf5c89c, // Realistic skin tone
+        roughness: 0.6,
+        metalness: 0.0
+    });
+
+    // Load skin texture
+    if (skinColor) {
+        headMaterial.map = skinColor;
+        setTextureSRGB(skinColor);
+    } else {
+        tryLoadTexture('https://threejs.org/examples/textures/brick_diffuse.jpg', 'https://threejs.org/examples/textures/brick_diffuse.jpg', (texture) => {
+            headMaterial.map = texture;
+            setTextureSRGB(texture);
+            headMaterial.needsUpdate = true;
+        });
+    }
+
+    const head = new THREE.Mesh(headGeometry, headMaterial);
+    head.position.set(0, 1.12, 0);
+    head.castShadow = true;
+    head.receiveShadow = true;
+    humanGroup.add(head);
+
+    // Eyes - more detailed
+    const eyeGeometry = new THREE.SphereGeometry(0.028, 12, 8);
+    const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0x2c3e50 }); // Dark brown eyes
+
+    const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+    leftEye.position.set(-0.075, 1.15, 0.19);
+    humanGroup.add(leftEye);
+
+    const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+    rightEye.position.set(0.075, 1.15, 0.19);
+    humanGroup.add(rightEye);
+
+    // Eyebrows
+    const eyebrowGeometry = new THREE.BoxGeometry(0.04, 0.005, 0.02);
+    const eyebrowMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+
+    const leftEyebrow = new THREE.Mesh(eyebrowGeometry, eyebrowMaterial);
+    leftEyebrow.position.set(-0.075, 1.18, 0.195);
+    humanGroup.add(leftEyebrow);
+
+    const rightEyebrow = new THREE.Mesh(eyebrowGeometry, eyebrowMaterial);
+    rightEyebrow.position.set(0.075, 1.18, 0.195);
+    humanGroup.add(rightEyebrow);
+
+    // Nose - more detailed
+    const noseGeometry = new THREE.ConeGeometry(0.025, 0.1, 8);
+    const noseMaterial = new THREE.MeshStandardMaterial({
+        color: 0xe8b4a2,
+        roughness: 0.5,
+        metalness: 0.0
+    });
+    const nose = new THREE.Mesh(noseGeometry, noseMaterial);
+    nose.position.set(0, 1.08, 0.21);
+    nose.rotation.x = Math.PI / 2;
+    humanGroup.add(nose);
+
+    // Mouth - more realistic
+    const mouthGeometry = new THREE.TorusGeometry(0.025, 0.008, 8, 16, Math.PI);
+    const mouthMaterial = new THREE.MeshBasicMaterial({ color: 0x8B4513 });
+    const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
+    mouth.position.set(0, 1.04, 0.19);
+    mouth.rotation.x = Math.PI / 2;
+    humanGroup.add(mouth);
+
+    // Hair
+    const hairGeometry = new THREE.SphereGeometry(0.23, 16, 12);
+    hairGeometry.scale(1, 0.8, 1);
+    const hairMaterial = new THREE.MeshStandardMaterial({
+        color: 0x8B4513, // Brown hair
+        roughness: 0.9,
+        metalness: 0.0
+    });
+    const hair = new THREE.Mesh(hairGeometry, hairMaterial);
+    hair.position.set(0, 1.18, -0.02);
+    hair.castShadow = true;
+    humanGroup.add(hair);
+
+    // Arms - anatomically correct proportions
+    const upperArmGeometry = new THREE.CapsuleGeometry(0.11, 0.35, 8, 16);
+    const lowerArmGeometry = new THREE.CapsuleGeometry(0.09, 0.35, 8, 16);
+    const armMaterial = new THREE.MeshStandardMaterial({
+        color: 0xf5c89c, // Skin tone
+        roughness: 0.7,
+        metalness: 0.0
+    });
+
+    if (skinColor) {
+        armMaterial.map = skinColor;
+        setTextureSRGB(skinColor);
+    }
+
+    // Left arm
+    const leftUpperArm = new THREE.Mesh(upperArmGeometry, armMaterial);
+    leftUpperArm.position.set(-0.48, 0.6, 0);
+    leftUpperArm.rotation.z = 0.3;
+    leftUpperArm.castShadow = true;
+    leftUpperArm.receiveShadow = true;
+    humanGroup.add(leftUpperArm);
+
+    const leftLowerArm = new THREE.Mesh(lowerArmGeometry, armMaterial);
+    leftLowerArm.position.set(-0.65, 0.25, 0);
+    leftLowerArm.rotation.z = 0.2;
+    leftLowerArm.castShadow = true;
+    leftLowerArm.receiveShadow = true;
+    humanGroup.add(leftLowerArm);
+
+    // Right arm
+    const rightUpperArm = new THREE.Mesh(upperArmGeometry, armMaterial);
+    rightUpperArm.position.set(0.48, 0.6, 0);
+    rightUpperArm.rotation.z = -0.3;
+    rightUpperArm.castShadow = true;
+    rightUpperArm.receiveShadow = true;
+    humanGroup.add(rightUpperArm);
+
+    const rightLowerArm = new THREE.Mesh(lowerArmGeometry, armMaterial);
+    rightLowerArm.position.set(0.65, 0.25, 0);
+    rightLowerArm.rotation.z = -0.2;
+    rightLowerArm.castShadow = true;
+    rightLowerArm.receiveShadow = true;
+    humanGroup.add(rightLowerArm);
+
+    // Legs - anatomically correct
+    const upperLegGeometry = new THREE.CapsuleGeometry(0.14, 0.5, 8, 16);
+    const lowerLegGeometry = new THREE.CapsuleGeometry(0.12, 0.5, 8, 16);
+    const legMaterial = new THREE.MeshStandardMaterial({
+        color: 0x2c3e50, // Dark pants
+        roughness: 0.8,
+        metalness: 0.0
+    });
+
+    // Left leg
+    const leftUpperLeg = new THREE.Mesh(upperLegGeometry, legMaterial);
+    leftUpperLeg.position.set(-0.2, -0.25, 0);
+    leftUpperLeg.castShadow = true;
+    leftUpperLeg.receiveShadow = true;
+    humanGroup.add(leftUpperLeg);
+
+    const leftLowerLeg = new THREE.Mesh(lowerLegGeometry, legMaterial);
+    leftLowerLeg.position.set(-0.2, -0.75, 0);
+    leftLowerLeg.castShadow = true;
+    leftLowerLeg.receiveShadow = true;
+    humanGroup.add(leftLowerLeg);
+
+    // Right leg
+    const rightUpperLeg = new THREE.Mesh(upperLegGeometry, legMaterial);
+    rightUpperLeg.position.set(0.2, -0.25, 0);
+    rightUpperLeg.castShadow = true;
+    rightUpperLeg.receiveShadow = true;
+    humanGroup.add(rightUpperLeg);
+
+    const rightLowerLeg = new THREE.Mesh(lowerLegGeometry, legMaterial);
+    rightLowerLeg.position.set(0.2, -0.75, 0);
+    rightLowerLeg.castShadow = true;
+    rightLowerLeg.receiveShadow = true;
+    humanGroup.add(rightLowerLeg);
+
+    // Feet - anatomically correct
+    const footGeometry = new THREE.BoxGeometry(0.25, 0.08, 0.4);
+    const footMaterial = new THREE.MeshStandardMaterial({
+        color: 0x1a1a1a, // Black shoes
+        roughness: 0.7,
+        metalness: 0.1
+    });
+
+    const leftFoot = new THREE.Mesh(footGeometry, footMaterial);
+    leftFoot.position.set(-0.2, -1.25, 0.15);
+    leftFoot.castShadow = true;
+    leftFoot.receiveShadow = true;
+    humanGroup.add(leftFoot);
+
+    const rightFoot = new THREE.Mesh(footGeometry, footMaterial);
+    rightFoot.position.set(0.2, -1.25, 0.15);
+    rightFoot.castShadow = true;
+    rightFoot.receiveShadow = true;
+    humanGroup.add(rightFoot);
+
+    // Position the human
+    humanGroup.position.set(x, 0, z);
+
+    // Scale up the custom human slightly less
+    humanGroup.scale.set(1.3, 1.3, 1.3); // Slightly smaller human height
+
+    // Add comprehensive human animations
+    addHumanAnimation(humanGroup);
+
+    scene.add(humanGroup);
+    animatedHumans.push(humanGroup);
+    obstacles.push({ x, z, radius: 1.3 }); // Adjusted radius for human size
+}
+
+function addHumanAnimation(humanGroup) {
+    let walkTime = 0;
+    const walkSpeed = 1.6;
+    const walkAmplitude = 0.025;
+    const humanMoveSpeed = 0.8;
+    let direction = Math.random() * Math.PI * 2;
+    let animationState = 'walking'; // walking, idle, turning
+    let stateTimer = 0;
+    let idleTimer = 0;
+
+    // Get references to body parts for animation (for loaded GLTF model)
+    let torso, head, leftUpperArm, rightUpperArm, leftLowerArm, rightLowerArm;
+    let leftUpperLeg, rightUpperLeg, leftLowerLeg, rightLowerLeg, leftFoot, rightFoot;
+
+    if (humanGroup.children && humanGroup.children.length > 0) {
+        // For loaded GLTF model, find parts by name or traverse
+        humanGroup.traverse((child) => {
+            if (child.isMesh) {
+                const name = child.name.toLowerCase();
+                if (name.includes('torso') || name.includes('body') || (child.geometry.type === 'CapsuleGeometry' && child.position.y > 0.3)) {
+                    torso = child;
+                } else if (name.includes('head') || (child.geometry.type === 'SphereGeometry' && child.position.y > 1)) {
+                    head = child;
+                } else if ((name.includes('arm') || name.includes('upper')) && child.position.x < -0.4 && child.position.y > 0.5) {
+                    leftUpperArm = child;
+                } else if ((name.includes('arm') || name.includes('upper')) && child.position.x > 0.4 && child.position.y > 0.5) {
+                    rightUpperArm = child;
+                } else if ((name.includes('arm') || name.includes('lower')) && child.position.x < -0.6 && child.position.y < 0.4) {
+                    leftLowerArm = child;
+                } else if ((name.includes('arm') || name.includes('lower')) && child.position.x > 0.6 && child.position.y < 0.4) {
+                    rightLowerArm = child;
+                } else if ((name.includes('leg') || name.includes('upper')) && child.position.x < -0.1 && child.position.y < -0.1 && child.position.y > -0.5) {
+                    leftUpperLeg = child;
+                } else if ((name.includes('leg') || name.includes('upper')) && child.position.x > 0.1 && child.position.y < -0.1 && child.position.y > -0.5) {
+                    rightUpperLeg = child;
+                } else if ((name.includes('leg') || name.includes('lower')) && child.position.x < -0.1 && child.position.y < -0.6) {
+                    leftLowerLeg = child;
+                } else if ((name.includes('leg') || name.includes('lower')) && child.position.x > 0.1 && child.position.y < -0.6) {
+                    rightLowerLeg = child;
+                } else if (name.includes('foot') && child.position.x < -0.1 && child.position.y < -1.1) {
+                    leftFoot = child;
+                } else if (name.includes('foot') && child.position.x > 0.1 && child.position.y < -1.1) {
+                    rightFoot = child;
+                }
+            }
+        });
+    }
+
+    // Store the animation function to be called from main loop
+    humanGroup.userData = humanGroup.userData || {};
+    humanGroup.userData.animate = (delta) => {
+        walkTime += delta;
+        stateTimer += delta;
+
+        // State management
+        if (animationState === 'walking') {
+            if (stateTimer > 8 + Math.random() * 5) { // Walk for 8-13 seconds
+                animationState = Math.random() < 0.3 ? 'turning' : 'idle';
+                stateTimer = 0;
+            }
+        } else if (animationState === 'idle') {
+            idleTimer += delta;
+            if (idleTimer > 2 + Math.random() * 3) { // Idle for 2-5 seconds
+                animationState = 'walking';
+                idleTimer = 0;
+                stateTimer = 0;
+            }
+        } else if (animationState === 'turning') {
+            if (stateTimer > 1.5) { // Turn for 1.5 seconds
+                animationState = 'walking';
+                stateTimer = 0;
+            }
+        }
+
+        // Movement and direction - actually move the human
+        if (animationState === 'walking') {
+            // Random direction changes while walking
+            if (Math.random() < 0.002) {
+                direction = Math.random() * Math.PI * 2;
+            }
+
+            const moveX = Math.cos(direction) * humanMoveSpeed * delta;
+            const moveZ = Math.sin(direction) * humanMoveSpeed * delta;
+
+            const newX = humanGroup.position.x + moveX;
+            const newZ = humanGroup.position.z + moveZ;
+
+            // Boundary check
+            if (Math.abs(newX) > 85 || Math.abs(newZ) > 85) {
+                direction = Math.random() * Math.PI * 2;
+            } else {
+                humanGroup.position.x = newX;
+                humanGroup.position.z = newZ;
+            }
+
+            // Update obstacle position for collision detection
+            const obstacleIndex = obstacles.findIndex(obs => Math.abs(obs.x - humanGroup.position.x) < 0.1 && Math.abs(obs.z - humanGroup.position.z) < 0.1);
+            if (obstacleIndex !== -1) {
+                obstacles[obstacleIndex].x = newX;
+                obstacles[obstacleIndex].z = newZ;
+            }
+        } else if (animationState === 'turning') {
+            // Smooth turning animation
+            const turnSpeed = 0.05;
+            direction += turnSpeed;
+        }
+
+        humanGroup.rotation.y = direction;
+
+        // Always apply walking animation regardless of state for visual feedback
+
+        if (animationState === 'walking') {
+            // Natural walking animation
+            const bodyBob = Math.sin(walkTime * walkSpeed) * walkAmplitude;
+            humanGroup.position.y = bodyBob;
+
+            // Arm swing with proper shoulder movement
+            const armSwing = Math.sin(walkTime * walkSpeed) * 0.35;
+            if (leftUpperArm) leftUpperArm.rotation.x = armSwing;
+            if (rightUpperArm) rightUpperArm.rotation.x = -armSwing;
+            if (leftLowerArm) leftLowerArm.rotation.x = armSwing * 0.8;
+            if (rightLowerArm) rightLowerArm.rotation.x = -armSwing * 0.8;
+
+            // Leg movement with knee bending
+            const legSwing = Math.sin(walkTime * walkSpeed) * 0.3;
+            if (leftUpperLeg) leftUpperLeg.rotation.x = legSwing;
+            if (rightUpperLeg) rightUpperLeg.rotation.x = -legSwing;
+            if (leftLowerLeg) leftLowerLeg.rotation.x = legSwing * 0.6;
+            if (rightLowerLeg) rightLowerLeg.rotation.x = -legSwing * 0.6;
+
+            // Foot movement
+            if (leftFoot) leftFoot.rotation.x = Math.sin(walkTime * walkSpeed) * 0.12;
+            if (rightFoot) rightFoot.rotation.x = -Math.sin(walkTime * walkSpeed) * 0.12;
+
+            // Subtle head bob
+            if (head) head.position.y = 1.12 + Math.sin(walkTime * walkSpeed * 2) * 0.003;
+        } else if (animationState === 'idle') {
+            // Idle animation - subtle breathing and shifting
+            const breathe = Math.sin(walkTime * 0.5) * 0.005;
+            humanGroup.position.y = breathe;
+
+            // Slight arm movement
+            const armIdle = Math.sin(walkTime * 0.3) * 0.05;
+            if (leftUpperArm) leftUpperArm.rotation.x = armIdle;
+            if (rightUpperArm) rightUpperArm.rotation.x = -armIdle;
+
+            // Weight shifting between legs
+            const weightShift = Math.sin(walkTime * 0.4) * 0.02;
+            if (leftUpperLeg) leftUpperLeg.rotation.x = weightShift;
+            if (rightUpperLeg) rightUpperLeg.rotation.x = -weightShift;
+        } else if (animationState === 'turning') {
+            // Turning animation - look around
+            if (head) {
+                head.rotation.y = Math.sin(stateTimer * 3) * 0.3;
+            }
+        }
+    };
+}
+
+for (let i = 0; i < 8; i++) {
+    const x = (Math.random() - 0.5) * 100;
+    const z = (Math.random() - 0.5) * 100;
+    createAnimatedHuman(x, z);
+}
+
+// Add ducks to the scene
+for (let i = 0; i < 12; i++) {
+    const x = (Math.random() - 0.5) * 120;
+    const z = (Math.random() - 0.5) * 120;
+    createRealisticDuck(x, z);
+}
+
+// GLTF Loader for 3D models
+
+// Debug function for GLTF loading
+function loadGLTFModel(path, onLoad, onError) {
+    console.log('Attempting to load GLTF model from:', path);
+    gltfLoader.load(
+        path,
+        (gltf) => {
+            console.log('GLTF model loaded successfully:', path);
+            onLoad(gltf);
+        },
+        (progress) => {
+            console.log('GLTF loading progress:', progress);
+        },
+        (error) => {
+            console.error('Error loading GLTF model:', path, error);
+            if (onError) onError(error);
+        }
+    );
+}
+
+
 
 // Collectibles (fruits)
 let score = 0;
@@ -1398,19 +1967,7 @@ for (let i = 0; i < 10; i++) {
     createFruit(x, z);
 }
 
-// Add farmers
-for (let i = 0; i < 5; i++) {
-    const x = (Math.random() - 0.5) * 80;
-    const z = (Math.random() - 0.5) * 80;
-    createFarmer(x, z);
-}
 
-// Add ordinary people
-for (let i = 0; i < 8; i++) {
-    const x = (Math.random() - 0.5) * 100;
-    const z = (Math.random() - 0.5) * 100;
-    createPerson(x, z);
-}
 
 // Add crops
 for (let i = 0; i < 15; i++) {
@@ -1454,11 +2011,6 @@ function checkCollision(newX, newZ) {
 }
 
 // Audio will be created on user gesture (when game starts) to satisfy browser autoplay policies
-let audioContext = null;
-function initAudio() {
-    if (audioContext) return;
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-}
 
 function createBeep(frequency, duration, volume = 0.1) {
     if (!audioContext) return;
@@ -1555,9 +2107,15 @@ function animate() {
         });
     }
 
-    // update water animation uniform (slower for realism)
-    water.material.uniforms['time'].value += 0.5 / 60.0;
+    // update water animation with dynamic properties
+    water.material.uniforms['time'].value += 0.8 / 60.0;
     water.material.uniforms['sunDirection'].value.copy(directionalLight.position).normalize();
+    
+    // Animate caustics for realistic water effect
+    if (caustics) {
+        caustics.material.opacity = 0.08 + Math.sin(Date.now() * 0.001) * 0.02;
+        caustics.position.y = 0.01 + Math.sin(Date.now() * 0.002) * 0.005;
+    }
 
     // update sky for reflections
     sky.material.uniforms['sunPosition'].value.copy(sun);
@@ -1572,70 +2130,21 @@ function animate() {
         }
     }
 
-    // Farmer movement and harvesting
-    for (const farmer of farmers) {
-        if (!farmer.target || farmer.target.harvested) {
-            // Find nearest unharvested crop
-            let nearest = null;
-            let minDist = Infinity;
-            for (const crop of crops) {
-                if (!crop.harvested) {
-                    const dist = Math.hypot(farmer.x - crop.x, farmer.z - crop.z);
-                    if (dist < minDist) {
-                        minDist = dist;
-                        nearest = crop;
-                    }
-                }
-            }
-            farmer.target = nearest;
-        }
 
-        if (farmer.target && !farmer.target.harvested) {
-            const dx = farmer.target.x - farmer.x;
-            const dz = farmer.target.z - farmer.z;
-            const dist = Math.sqrt(dx * dx + dz * dz);
-
-            if (dist > 0.5) {
-                // Move towards target
-                const moveX = (dx / dist) * farmer.speed * delta;
-                const moveZ = (dz / dist) * farmer.speed * delta;
-                farmer.x += moveX;
-                farmer.z += moveZ;
-                farmer.group.position.set(farmer.x, 0, farmer.z);
-
-                // Rotate to face direction
-                farmer.group.rotation.y = Math.atan2(dx, dz);
-            } else {
-                // Harvest
-                farmer.target.harvested = true;
-                farmer.target.group.visible = false; // Hide the crop
-                farmer.target = null;
-                // Do not add to main score, just play sound
-                playCollectSound(); // Reuse collect sound
-            }
-        } else {
-            // No target, move randomly
-            farmer.group.rotation.y += (Math.random() - 0.5) * 0.1;
-            const moveX = Math.cos(farmer.group.rotation.y) * farmer.speed * delta * 0.5;
-            const moveZ = Math.sin(farmer.group.rotation.y) * farmer.speed * delta * 0.5;
-            farmer.x += moveX;
-            farmer.z += moveZ;
-            farmer.group.position.set(farmer.x, 0, farmer.z);
-        }
-    }
-
-    // Ordinary people movement (random wandering)
-    for (const person of people) {
-        person.group.rotation.y += (Math.random() - 0.5) * 0.05;
-        const moveX = Math.cos(person.group.rotation.y) * person.speed * delta;
-        const moveZ = Math.sin(person.group.rotation.y) * person.speed * delta;
-        person.x += moveX;
-        person.z += moveZ;
-        person.group.position.set(person.x, 0, person.z);
-    }
 
     // Update weather
     updateWeather(delta);
+
+    // Update animated humans and ducks
+    for (const character of animatedHumans) {
+        if (character.userData && character.userData.animate) {
+            character.userData.animate(delta);
+        }
+    }
+
+    for (const mixer of mixers) {
+        mixer.update(delta);
+    }
 
     renderer.render(scene, camera);
 }
@@ -1731,49 +2240,32 @@ window.__GAME = {
     rockMeshes,
     leafMeshes,
     wallMaterials,
+    animatedHumans,
     createTree,
     createRock,
     createHouse,
     createBush,
     createFruit,
-    createFarmer,
     createCrop,
-    createPerson,
     collectibles,
     houses,
     obstacles,
-    farmers,
     crops,
-    people,
     ground,
     loader,
     tryLoadTexture,
 };
 
 // Also export named symbols for environments that prefer module imports
-export {
-    scene,
-    camera,
-    renderer,
-    trunkMeshes,
-    rockMeshes,
-    leafMeshes,
-    wallMaterials,
-    createTree,
-    createRock,
-    createHouse,
-    createBush,
-    createFruit,
-    createFarmer,
-    createCrop,
-    createPerson,
-    collectibles,
-    houses,
-    obstacles,
-    farmers,
-    crops,
-    people,
-    ground,
-    loader,
-    tryLoadTexture,
-};
+// Note: Export commented out to avoid module import issues in browser"}" 
+
+
+
+
+
+
+
+
+
+
+

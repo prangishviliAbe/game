@@ -14,7 +14,10 @@ const mimeTypes = {
   '.gif': 'image/gif',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
-  '.json': 'application/json'
+  '.json': 'application/json',
+  '.glb': 'application/octet-stream',
+  '.gltf': 'model/gltf+json',
+  '.bin': 'application/octet-stream'
 };
 
 const server = http.createServer((req, res) => {
@@ -37,11 +40,16 @@ const server = http.createServer((req, res) => {
       }
     } else {
       res.writeHead(200, { 'Content-Type': mimeType });
-      res.end(content, 'utf-8');
+      // For binary files, don't specify encoding
+      if (mimeType.startsWith('application/') || mimeType.startsWith('model/') || (mimeType.startsWith('image/') && !mimeType.includes('svg'))) {
+        res.end(content);
+      } else {
+        res.end(content, 'utf-8');
+      }
     }
-  });
+  });ნ
 });
 
-server.listen(port, () => {
+server.listen(port, '0.0.0.0', () => {
   console.log(`Server running at http://localhost:${port}/`);
 });
