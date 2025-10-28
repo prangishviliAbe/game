@@ -1393,7 +1393,7 @@ function addDuckAnimation(duckGroup) {
     let animationTime = 0;
     const swimSpeed = 1.2;
     const walkSpeed = 0.8;
-    const duckMoveSpeed = 1.0;
+    const duckMoveSpeed = 3.0;
     let direction = Math.random() * Math.PI * 2;
     let isSwimming = Math.random() < 0.6; // 60% chance of swimming
 
@@ -1720,7 +1720,7 @@ function addHumanAnimation(humanGroup) {
     let walkTime = 0;
     const walkSpeed = 1.6;
     const walkAmplitude = 0.025;
-    const humanMoveSpeed = 0.8;
+    const humanMoveSpeed = 2.5;
     let direction = Math.random() * Math.PI * 2;
     let animationState = 'walking'; // walking, idle, turning
     let stateTimer = 0;
