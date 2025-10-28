@@ -47,7 +47,7 @@ const server = http.createServer((req, res) => {
         res.end(content, 'utf-8');
       }
     }
-  });ნ
+  });
 });
 
 server.listen(port, '0.0.0.0', () => {
