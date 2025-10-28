@@ -1427,7 +1427,7 @@ function addDuckAnimation(duckGroup) {
         animationTime += delta;
 
         // Random direction changes
-        if (Math.random() < 0.004) {
+        if (Math.random() < 0.01) {
             direction = Math.random() * Math.PI * 2;
             isSwimming = Math.random() < 0.6;
         }
@@ -1772,19 +1772,19 @@ function addHumanAnimation(humanGroup) {
 
         // State management
         if (animationState === 'walking') {
-            if (stateTimer > 8 + Math.random() * 5) { // Walk for 8-13 seconds
+            if (stateTimer > 3 + Math.random() * 2) { // Walk for 3-5 seconds
                 animationState = Math.random() < 0.3 ? 'turning' : 'idle';
                 stateTimer = 0;
             }
         } else if (animationState === 'idle') {
             idleTimer += delta;
-            if (idleTimer > 2 + Math.random() * 3) { // Idle for 2-5 seconds
+            if (idleTimer > 1 + Math.random() * 1) { // Idle for 1-2 seconds
                 animationState = 'walking';
                 idleTimer = 0;
                 stateTimer = 0;
             }
         } else if (animationState === 'turning') {
-            if (stateTimer > 1.5) { // Turn for 1.5 seconds
+            if (stateTimer > 0.5) { // Turn for 0.5 seconds
                 animationState = 'walking';
                 stateTimer = 0;
             }
@@ -1793,7 +1793,7 @@ function addHumanAnimation(humanGroup) {
         // Movement and direction - actually move the human
         if (animationState === 'walking') {
             // Random direction changes while walking
-            if (Math.random() < 0.002) {
+            if (Math.random() < 0.005) {
                 direction = Math.random() * Math.PI * 2;
             }
 
