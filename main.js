@@ -1133,7 +1133,7 @@ function createRock(x, z) {
     rockMeshes.push(rock);
 }
 
-// Rocks removed as requested
+// Stones removed as requested
 
 
 // Rain system
@@ -2656,6 +2656,88 @@ function loadGLTFModel(path, onLoad, onError) {
     );
 }
 
+// Keyframe Animation Utilities (based on Three.js webgl_animation_keyframes example)
+function createKeyframeAnimation(object, duration = 2, loop = true) {
+    // Create position keyframes for a simple bounce animation
+    const positionKF = new THREE.VectorKeyframeTrack(
+        '.position',
+        [0, 0.5, 1, 1.5, 2],
+        [
+            object.position.x, object.position.y, object.position.z,
+            object.position.x, object.position.y + 2, object.position.z,
+            object.position.x, object.position.y, object.position.z,
+            object.position.x, object.position.y + 1, object.position.z,
+            object.position.x, object.position.y, object.position.z
+        ]
+    );
+
+    // Create rotation keyframes
+    const rotationKF = new THREE.QuaternionKeyframeTrack(
+        '.quaternion',
+        [0, 1, 2],
+        [
+            0, 0, 0, 1,
+            0, 0, Math.PI * 0.5, 1,
+            0, 0, Math.PI, 1
+        ]
+    );
+
+    // Create scale keyframes
+    const scaleKF = new THREE.VectorKeyframeTrack(
+        '.scale',
+        [0, 0.5, 1, 1.5, 2],
+        [
+            1, 1, 1,
+            1.2, 0.8, 1.2,
+            1, 1, 1,
+            0.8, 1.2, 0.8,
+            1, 1, 1
+        ]
+    );
+
+    // Create animation clip
+    const clip = new THREE.AnimationClip('bounce', duration, [positionKF, rotationKF, scaleKF]);
+
+    // Create animation mixer if not exists
+    if (!object.userData.mixer) {
+        object.userData.mixer = new THREE.AnimationMixer(object);
+        mixers.push(object.userData.mixer);
+    }
+
+    // Create animation action
+    const action = object.userData.mixer.clipAction(clip);
+    if (loop) {
+        action.loop = THREE.LoopRepeat;
+    }
+
+    return action;
+}
+
+function playKeyframeAnimation(object, animationName = 'bounce') {
+    if (object.userData.mixer) {
+        const action = object.userData.mixer.existingAction(animationName);
+        if (action) {
+            action.play();
+        }
+    }
+}
+
+function stopKeyframeAnimation(object, animationName = 'bounce') {
+    if (object.userData.mixer) {
+        const action = object.userData.mixer.existingAction(animationName);
+        if (action) {
+            action.stop();
+        }
+    }
+}
+
+// Custom keyframe animation for collectibles (fruits)
+function createCollectibleAnimation(fruit) {
+    const action = createKeyframeAnimation(fruit, 3, true);
+    action.name = 'bounce';
+    return action;
+}
+
 
 
 // Collectibles (fruits)
@@ -2671,6 +2753,10 @@ function createFruit(x, z) {
     fruit.castShadow = true;
     scene.add(fruit);
     collectibles.push(fruit);
+
+    // Add keyframe animation to the fruit
+    createCollectibleAnimation(fruit);
+    playKeyframeAnimation(fruit, 'bounce');
 }
 
 // Crops for harvesting
@@ -2702,7 +2788,12 @@ function createCrop(x, z) {
 
 // Bushes removed as requested - they had no textures and looked poor
 
-// Add fruits - removed
+// Add fruits with keyframe animations
+for (let i = 0; i < 5; i++) {
+    const x = (Math.random() - 0.5) * 100;
+    const z = (Math.random() - 0.5) * 100;
+    createFruit(x, z);
+}
 
 
 
@@ -3173,6 +3264,8 @@ function createMinimap() {
             }
         });
 
+        // Stones removed from minimap
+
         // Draw Soviet buildings
         sovietBuildingPositions.forEach(building => {
             const buildingX = centerX + (building.x * scale);
@@ -3257,7 +3350,7 @@ if (minimapStartButton) {
     });
 }
 
-// Expose a runtime handle for the editor to avoid import/export edge-cases
+// Expose a runtime handle for the game
 window.__GAME = {
     scene,
     camera,
