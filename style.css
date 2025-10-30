@@ -65,6 +65,7 @@ body {
     cursor: pointer;
 }
 
+
 #start-button:active { transform: translateY(1px); }
 
 .score {
