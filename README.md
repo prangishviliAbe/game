@@ -1,6 +1,29 @@
-# Jungle Adventure (browser)
+# Jungle Adventure (browser) 🏞️
 
-Simple browser-based 3D jungle adventure demo using Three.js.
+Immersive 3D jungle adventure featuring realistic human characters and dynamic environments built with Three.js.
+
+**🎮 Features:**
+
+- Realistic 3D human characters (Metacreators model)
+- Interactive ducks with swimming/walking animations
+- Dynamic weather system with rain
+- Interactive fruit collection gameplay
+- Built-in scene editor
+- PBR materials and advanced lighting
+- Multiple tree types and environmental details
+
+**👥 Character Models:**
+
+- **Humans**: High-quality Metacreators base human model with advanced animations
+- **Ducks**: Realistic animated duck models with swimming behavior
+
+**🌟 Visual Quality:**
+
+- Physically Based Rendering (PBR)
+- Dynamic shadows and lighting
+- Atmospheric effects and weather
+- Realistic water with reflections
+- Procedurally generated vegetation
 
 How to run locally
 

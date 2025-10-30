@@ -80,6 +80,7 @@ function openEditor() {
   refreshEditor();
 }
 
+
 function closeEditor() {
   panel.style.display = 'none';
 }

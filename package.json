@@ -16,5 +16,8 @@
   "bugs": {
     "url": "https://github.com/prangishviliAbe/game/issues"
   },
-  "homepage": "https://github.com/prangishviliAbe/game#readme"
+  "homepage": "https://github.com/prangishviliAbe/game#readme",
+  "dependencies": {
+    "adm-zip": "^0.5.16"
+  }
 }
