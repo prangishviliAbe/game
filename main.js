@@ -1324,6 +1324,18 @@ function createAnimatedHuman(x, z) {
             stateTimer += delta;
             walkCycle += delta * currentSpeed;
 
+            // Check distance to player for activation
+            const distanceToPlayer = Math.hypot(
+                model.position.x - camera.position.x,
+                model.position.z - camera.position.z
+            );
+
+            // Only animate if close to player
+            if (distanceToPlayer > 50) {
+                // NPCs far from player don't move
+                return;
+            }
+
             // State management with realistic transitions
             if (animationState === 'walking' || animationState === 'running') {
                 // Random state changes while moving
@@ -1497,7 +1509,19 @@ function createAnimatedHuman(x, z) {
                 walkTime += delta;
                 stateTimer += delta;
                 walkCycle += delta * currentSpeed;
-
+    
+                // Check distance to player for activation
+                const distanceToPlayer = Math.hypot(
+                    model.position.x - camera.position.x,
+                    model.position.z - camera.position.z
+                );
+    
+                // Only animate if close to player
+                if (distanceToPlayer > 50) {
+                    // NPCs far from player don't move
+                    return;
+                }
+    
                 // State management with realistic transitions
                 if (animationState === 'walking' || animationState === 'running') {
                     // Random state changes while moving
@@ -1507,32 +1531,32 @@ function createAnimatedHuman(x, z) {
                         stateTimer = 0;
                         idleTime = 0;
                     }
-
+    
                     // Occasional direction changes
                     if (Math.random() < 0.008) {
                         targetDirection = direction + (Math.random() - 0.5) * Math.PI * 0.8;
                         turnSpeed = (Math.random() - 0.5) * 0.05;
                     }
-
+    
                     // Smooth direction interpolation
                     const angleDiff = targetDirection - direction;
                     let shortestAngle = angleDiff;
                     if (angleDiff > Math.PI) shortestAngle -= 2 * Math.PI;
                     if (angleDiff < -Math.PI) shortestAngle += 2 * Math.PI;
-
+    
                     direction += shortestAngle * 0.02;
                     model.rotation.y = direction;
-
+    
                     // Movement with slight bobbing
                     const bob = Math.sin(walkCycle * 2) * 0.02;
                     model.position.y = bob;
-
+    
                     const moveX = Math.cos(direction) * currentSpeed * delta;
                     const moveZ = Math.sin(direction) * currentSpeed * delta;
-
+    
                     const newX = model.position.x + moveX;
                     const newZ = model.position.z + moveZ;
-
+    
                     // Boundary check with more realistic behavior
                     if (Math.abs(newX) > 85 || Math.abs(newZ) > 85) {
                         targetDirection = Math.atan2(-model.position.z, -model.position.x) + (Math.random() - 0.5) * Math.PI * 0.5;
@@ -1541,19 +1565,19 @@ function createAnimatedHuman(x, z) {
                         model.position.x = newX;
                         model.position.z = newZ;
                     }
-
+    
                     // Update obstacle position for collision detection
                     const obstacleIndex = obstacles.findIndex(obs => Math.abs(obs.x - model.position.x) < 0.1 && Math.abs(obs.z - model.position.z) < 0.1);
                     if (obstacleIndex !== -1) {
                         obstacles[obstacleIndex].x = newX;
                         obstacles[obstacleIndex].z = newZ;
                     }
-
+    
                     // Random speed variations
                     if (Math.random() < 0.01) {
                         currentSpeed = humanMoveSpeed * (0.8 + Math.random() * 0.4);
                     }
-
+    
                 } else if (animationState === 'idle') {
                     idleTime += delta;
 
@@ -3019,23 +3043,23 @@ function animate() {
 
     // Performance-optimized animation update
     // Skip animation updates for very distant characters to improve performance
-    const maxVisibleDistance = 50;
-    const frameSkipDistance = 30;
+    const maxVisibleDistance = 200; // Increased distance for NPCs to move even when far
+    const frameSkipDistance = 100;
     let frameCounter = 0;
-    
+
     for (const character of animatedHumans) {
         if (character.userData && character.userData.animate) {
             const distanceToCamera = Math.hypot(
                 character.position.x - camera.position.x,
                 character.position.z - camera.position.z
             );
-            
+
             // Skip animation updates for very distant characters
             if (distanceToCamera > maxVisibleDistance) continue;
-            
+
             // Frame skipping for medium-distant characters
             if (distanceToCamera > frameSkipDistance && frameCounter % 2 === 0) continue;
-            
+
             character.userData.animate(delta);
         }
     }
