@@ -5,7 +5,6 @@ import { Sky } from './scripts/Sky.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const gltfLoader = new GLTFLoader();
-
 // Scene setup
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB); // Sky blue background
@@ -470,65 +469,9 @@ ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-// Enhanced water with realistic reflections and materials
-const riverWidth = 8;
-const riverLength = 300;
-const waterGeometry = new THREE.PlaneGeometry(riverWidth, riverLength, 32, 32); // Higher resolution
+// Pond and clearing removed as requested
 
-// Create water with advanced properties
-const water = new Water(
-    waterGeometry,
-    {
-        textureWidth: 1024,
-        textureHeight: 1024,
-        clipBias: 0.0,
-        waterNormals: new THREE.TextureLoader().load('https://threejs.org/examples/textures/waternormals.jpg', function (texture) {
-            texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-            texture.minFilter = THREE.LinearMipMapLinearFilter;
-        }),
-        sunDirection: directionalLight.position.clone().normalize(),
-        sunColor: 0xfff1c1,
-        waterColor: 0x006994, // More realistic water color
-        distortionScale: 8.0,
-        waterTextureScale: 0.08,
-        side: THREE.DoubleSide,
-        fog: scene.fog !== undefined,
-        // Enhanced reflection properties
-        reflectivity: 0.8,
-        alpha: 0.9
-    }
-);
-water.rotation.x = - Math.PI / 2;
-water.position.set(0, 0.02, -100); // Slightly above ground
-scene.add(water);
-
-// Add water caustics effect
-const causticsGeometry = new THREE.PlaneGeometry(riverWidth * 1.2, riverLength * 1.2, 16, 16);
-const causticsMaterial = new THREE.MeshBasicMaterial({
-    color: 0x004477,
-    transparent: true,
-    opacity: 0.1,
-    side: THREE.DoubleSide
-});
-const caustics = new THREE.Mesh(causticsGeometry, causticsMaterial);
-caustics.rotation.x = - Math.PI / 2;
-caustics.position.set(0, 0.01, -100);
-scene.add(caustics);
-
-// Add banks around the river
-const bankHeight = 0.5;
-const bankWidth = 2;
-const leftBankGeo = new THREE.BoxGeometry(bankWidth, bankHeight, riverLength);
-const rightBankGeo = new THREE.BoxGeometry(bankWidth, bankHeight, riverLength);
-const bankMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
-const leftBank = new THREE.Mesh(leftBankGeo, bankMat);
-leftBank.position.set(-riverWidth / 2 - bankWidth / 2, 0, -100);
-leftBank.receiveShadow = true;
-scene.add(leftBank);
-const rightBank = new THREE.Mesh(rightBankGeo, bankMat);
-rightBank.position.set(riverWidth / 2 + bankWidth / 2, 0, -100);
-rightBank.receiveShadow = true;
-scene.add(rightBank);
+// Add banks around the ocean - removed since we now have a 3D ocean model
 
 
 // Skybox for reflections
@@ -1355,38 +1298,71 @@ function createAnimatedHuman(x, z) {
         }
         mixers.push(mixer);
 
-        // Enhanced movement logic with better animation integration
+        // Enhanced movement logic with realistic AI behavior
         let walkTime = 0;
         const walkSpeed = 1.6;
-        const humanMoveSpeed = 2.5;
+        const runSpeed = 3.2;
+        const humanMoveSpeed = 2.2;
         let direction = Math.random() * Math.PI * 2;
-        let animationState = 'walking'; // walking, idle, turning
+        let animationState = 'walking'; // walking, running, idle, turning, looking
         let stateTimer = 0;
+        let targetDirection = direction;
+        let turnSpeed = 0;
+        let currentSpeed = humanMoveSpeed;
+        let idleTime = 0;
+        let walkCycle = 0;
+
+        // Personality traits for varied behavior
+        const personality = {
+            activity: 0.3 + Math.random() * 0.7, // How active (0-1)
+            curiosity: 0.2 + Math.random() * 0.8, // How likely to look around
+            patience: 0.1 + Math.random() * 0.9   // How patient when idle
+        };
 
         model.userData.animate = (delta) => {
             walkTime += delta;
             stateTimer += delta;
+            walkCycle += delta * currentSpeed;
 
-            // State management - force continuous walking
-            animationState = 'walking';
-            stateTimer = 0;
-
-            // Movement and direction - actually move the human
-            if (animationState === 'walking') {
-                // Random direction changes while walking
-                if (Math.random() < 0.005) {
-                    direction = Math.random() * Math.PI * 2;
+            // State management with realistic transitions
+            if (animationState === 'walking' || animationState === 'running') {
+                // Random state changes while moving
+                if (Math.random() < personality.activity * 0.003) {
+                    const states = ['idle', 'turning', 'looking'];
+                    animationState = states[Math.floor(Math.random() * states.length)];
+                    stateTimer = 0;
+                    idleTime = 0;
                 }
 
-                const moveX = Math.cos(direction) * humanMoveSpeed * delta;
-                const moveZ = Math.sin(direction) * humanMoveSpeed * delta;
+                // Occasional direction changes
+                if (Math.random() < 0.008) {
+                    targetDirection = direction + (Math.random() - 0.5) * Math.PI * 0.8;
+                    turnSpeed = (Math.random() - 0.5) * 0.05;
+                }
+
+                // Smooth direction interpolation
+                const angleDiff = targetDirection - direction;
+                let shortestAngle = angleDiff;
+                if (angleDiff > Math.PI) shortestAngle -= 2 * Math.PI;
+                if (angleDiff < -Math.PI) shortestAngle += 2 * Math.PI;
+
+                direction += shortestAngle * 0.02;
+                model.rotation.y = direction;
+
+                // Movement with slight bobbing
+                const bob = Math.sin(walkCycle * 2) * 0.02;
+                model.position.y = bob;
+
+                const moveX = Math.cos(direction) * currentSpeed * delta;
+                const moveZ = Math.sin(direction) * currentSpeed * delta;
 
                 const newX = model.position.x + moveX;
                 const newZ = model.position.z + moveZ;
 
-                // Boundary check
+                // Boundary check with more realistic behavior
                 if (Math.abs(newX) > 85 || Math.abs(newZ) > 85) {
-                    direction = Math.random() * Math.PI * 2;
+                    targetDirection = Math.atan2(-model.position.z, -model.position.x) + (Math.random() - 0.5) * Math.PI * 0.5;
+                    stateTimer = 0;
                 } else {
                     model.position.x = newX;
                     model.position.z = newZ;
@@ -1398,9 +1374,60 @@ function createAnimatedHuman(x, z) {
                     obstacles[obstacleIndex].x = newX;
                     obstacles[obstacleIndex].z = newZ;
                 }
-            }
 
-            model.rotation.y = direction;
+                // Random speed variations
+                if (Math.random() < 0.01) {
+                    currentSpeed = humanMoveSpeed * (0.8 + Math.random() * 0.4);
+                }
+
+            } else if (animationState === 'idle') {
+                idleTime += delta;
+
+                // Breathing animation
+                const breathe = Math.sin(walkTime * 2) * 0.005;
+                model.position.y = breathe;
+
+                // Subtle head movements
+                if (Math.random() < personality.curiosity * 0.02) {
+                    model.rotation.y += (Math.random() - 0.5) * 0.1;
+                }
+
+                // Return to walking after random time
+                if (idleTime > personality.patience * (2 + Math.random() * 3)) {
+                    animationState = 'walking';
+                    stateTimer = 0;
+                    idleTime = 0;
+                }
+
+            } else if (animationState === 'turning') {
+                // Smooth turning animation
+                targetDirection += turnSpeed;
+                turnSpeed *= 0.95; // Slow down turning
+
+                const angleDiff = targetDirection - direction;
+                let shortestAngle = angleDiff;
+                if (angleDiff > Math.PI) shortestAngle -= 2 * Math.PI;
+                if (angleDiff < -Math.PI) shortestAngle += 2 * Math.PI;
+
+                direction += shortestAngle * 0.03;
+                model.rotation.y = direction;
+
+                if (stateTimer > 1 + Math.random() * 2) {
+                    animationState = 'walking';
+                    stateTimer = 0;
+                }
+
+            } else if (animationState === 'looking') {
+                // Looking around animation
+                const lookAngle = Math.sin(stateTimer * 2) * Math.PI * 0.3;
+                model.rotation.y = direction + lookAngle;
+
+                if (stateTimer > 2 + Math.random() * 2) {
+                    animationState = 'walking';
+                    stateTimer = 0;
+                    model.rotation.y = direction; // Reset to movement direction
+                }
+            }
         };
 
     }, (error) => {
@@ -1445,38 +1472,71 @@ function createAnimatedHuman(x, z) {
             }
             mixers.push(mixer);
 
-            // Add movement logic
+            // Enhanced movement logic with realistic AI behavior
             let walkTime = 0;
             const walkSpeed = 1.6;
-            const humanMoveSpeed = 2.5;
+            const runSpeed = 3.2;
+            const humanMoveSpeed = 2.2;
             let direction = Math.random() * Math.PI * 2;
-            let animationState = 'walking'; // walking, idle, turning
+            let animationState = 'walking'; // walking, running, idle, turning, looking
             let stateTimer = 0;
+            let targetDirection = direction;
+            let turnSpeed = 0;
+            let currentSpeed = humanMoveSpeed;
+            let idleTime = 0;
+            let walkCycle = 0;
+
+            // Personality traits for varied behavior
+            const personality = {
+                activity: 0.3 + Math.random() * 0.7, // How active (0-1)
+                curiosity: 0.2 + Math.random() * 0.8, // How likely to look around
+                patience: 0.1 + Math.random() * 0.9   // How patient when idle
+            };
 
             model.userData.animate = (delta) => {
                 walkTime += delta;
                 stateTimer += delta;
+                walkCycle += delta * currentSpeed;
 
-                // State management - force continuous walking
-                animationState = 'walking';
-                stateTimer = 0;
-
-                // Movement and direction - actually move the human
-                if (animationState === 'walking') {
-                    // Random direction changes while walking
-                    if (Math.random() < 0.005) {
-                        direction = Math.random() * Math.PI * 2;
+                // State management with realistic transitions
+                if (animationState === 'walking' || animationState === 'running') {
+                    // Random state changes while moving
+                    if (Math.random() < personality.activity * 0.003) {
+                        const states = ['idle', 'turning', 'looking'];
+                        animationState = states[Math.floor(Math.random() * states.length)];
+                        stateTimer = 0;
+                        idleTime = 0;
                     }
 
-                    const moveX = Math.cos(direction) * humanMoveSpeed * delta;
-                    const moveZ = Math.sin(direction) * humanMoveSpeed * delta;
+                    // Occasional direction changes
+                    if (Math.random() < 0.008) {
+                        targetDirection = direction + (Math.random() - 0.5) * Math.PI * 0.8;
+                        turnSpeed = (Math.random() - 0.5) * 0.05;
+                    }
+
+                    // Smooth direction interpolation
+                    const angleDiff = targetDirection - direction;
+                    let shortestAngle = angleDiff;
+                    if (angleDiff > Math.PI) shortestAngle -= 2 * Math.PI;
+                    if (angleDiff < -Math.PI) shortestAngle += 2 * Math.PI;
+
+                    direction += shortestAngle * 0.02;
+                    model.rotation.y = direction;
+
+                    // Movement with slight bobbing
+                    const bob = Math.sin(walkCycle * 2) * 0.02;
+                    model.position.y = bob;
+
+                    const moveX = Math.cos(direction) * currentSpeed * delta;
+                    const moveZ = Math.sin(direction) * currentSpeed * delta;
 
                     const newX = model.position.x + moveX;
                     const newZ = model.position.z + moveZ;
 
-                    // Boundary check
+                    // Boundary check with more realistic behavior
                     if (Math.abs(newX) > 85 || Math.abs(newZ) > 85) {
-                        direction = Math.random() * Math.PI * 2;
+                        targetDirection = Math.atan2(-model.position.z, -model.position.x) + (Math.random() - 0.5) * Math.PI * 0.5;
+                        stateTimer = 0;
                     } else {
                         model.position.x = newX;
                         model.position.z = newZ;
@@ -1488,9 +1548,60 @@ function createAnimatedHuman(x, z) {
                         obstacles[obstacleIndex].x = newX;
                         obstacles[obstacleIndex].z = newZ;
                     }
-                }
 
-                model.rotation.y = direction;
+                    // Random speed variations
+                    if (Math.random() < 0.01) {
+                        currentSpeed = humanMoveSpeed * (0.8 + Math.random() * 0.4);
+                    }
+
+                } else if (animationState === 'idle') {
+                    idleTime += delta;
+
+                    // Breathing animation
+                    const breathe = Math.sin(walkTime * 2) * 0.005;
+                    model.position.y = breathe;
+
+                    // Subtle head movements
+                    if (Math.random() < personality.curiosity * 0.02) {
+                        model.rotation.y += (Math.random() - 0.5) * 0.1;
+                    }
+
+                    // Return to walking after random time
+                    if (idleTime > personality.patience * (2 + Math.random() * 3)) {
+                        animationState = 'walking';
+                        stateTimer = 0;
+                        idleTime = 0;
+                    }
+
+                } else if (animationState === 'turning') {
+                    // Smooth turning animation
+                    targetDirection += turnSpeed;
+                    turnSpeed *= 0.95; // Slow down turning
+
+                    const angleDiff = targetDirection - direction;
+                    let shortestAngle = angleDiff;
+                    if (angleDiff > Math.PI) shortestAngle -= 2 * Math.PI;
+                    if (angleDiff < -Math.PI) shortestAngle += 2 * Math.PI;
+
+                    direction += shortestAngle * 0.03;
+                    model.rotation.y = direction;
+
+                    if (stateTimer > 1 + Math.random() * 2) {
+                        animationState = 'walking';
+                        stateTimer = 0;
+                    }
+
+                } else if (animationState === 'looking') {
+                    // Looking around animation
+                    const lookAngle = Math.sin(stateTimer * 2) * Math.PI * 0.3;
+                    model.rotation.y = direction + lookAngle;
+
+                    if (stateTimer > 2 + Math.random() * 2) {
+                        animationState = 'walking';
+                        stateTimer = 0;
+                        model.rotation.y = direction; // Reset to movement direction
+                    }
+                }
             };
         }, (fallbackError) => {
             console.warn('Failed to load CesiumMan model, using custom human:', fallbackError);
@@ -2649,6 +2760,8 @@ function createBeep(frequency, duration, volume = 0.1) {
 
 function playCollectSound() { createBeep(900, 0.12, 0.12); }
 function playAmbientSound() { createBeep(220 + Math.random() * 80, 0.4, 0.05); }
+function playFootstepSound() { createBeep(150 + Math.random() * 50, 0.08, 0.03); }
+function playWaterSound() { createBeep(300 + Math.random() * 100, 0.15, 0.04); }
 
 // Animation loop
 let lastTime = performance.now();
@@ -2771,16 +2884,21 @@ function animate() {
         }
     }
 
-
-    // update water animation with dynamic properties
-    water.material.uniforms['time'].value += 0.8 / 60.0;
-    water.material.uniforms['sunDirection'].value.copy(directionalLight.position).normalize();
-    
-    // Animate caustics for realistic water effect
-    if (caustics) {
-        caustics.material.opacity = 0.08 + Math.sin(Date.now() * 0.001) * 0.02;
-        caustics.position.y = 0.01 + Math.sin(Date.now() * 0.002) * 0.005;
+    // Play footstep sounds occasionally when moving
+    if ((moveState.forward || moveState.backward || moveState.left || moveState.right) && Math.random() < 0.02) {
+        playFootstepSound();
     }
+
+    // Play ambient sounds occasionally
+    if (Math.random() < 0.005) {
+        playAmbientSound();
+    }
+
+    // Water sounds removed
+
+
+    // Update ocean model animation if it exists
+    // (Water animation is handled by the GLTF model's built-in animation mixer)
 
     // update sky for reflections
     sky.material.uniforms['sunPosition'].value.copy(sun);
@@ -2799,6 +2917,14 @@ function animate() {
 
     // Update weather
     updateWeather(delta);
+
+    // Add subtle camera shake when moving for immersion
+    if (moveState.forward || moveState.backward || moveState.left || moveState.right) {
+        const shakeAmount = 0.02;
+        camera.position.x += (Math.random() - 0.5) * shakeAmount;
+        camera.position.y += (Math.random() - 0.5) * shakeAmount * 0.5;
+        camera.position.z += (Math.random() - 0.5) * shakeAmount;
+    }
 
     // Performance-optimized animation update
     // Skip animation updates for very distant characters to improve performance
@@ -2912,6 +3038,224 @@ window.addEventListener('resize', () => {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+// Create minimap/compass system
+function createMinimap() {
+    const minimapContainer = document.createElement('div');
+    minimapContainer.id = 'minimap-container';
+    minimapContainer.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        width: 200px;
+        height: 200px;
+        background: rgba(0, 0, 0, 0.7);
+        border: 2px solid #fff;
+        border-radius: 10px;
+        z-index: 1000;
+        overflow: hidden;
+    `;
+
+    const minimapCanvas = document.createElement('canvas');
+    minimapCanvas.id = 'minimap-canvas';
+    minimapCanvas.width = 200;
+    minimapCanvas.height = 200;
+    minimapCanvas.style.cssText = `
+        width: 100%;
+        height: 100%;
+        display: block;
+    `;
+
+    minimapContainer.appendChild(minimapCanvas);
+    document.body.appendChild(minimapContainer);
+
+    const ctx = minimapCanvas.getContext('2d');
+    const mapSize = 200; // World units to display
+    const scale = minimapCanvas.width / (mapSize * 2); // Scale factor
+
+    function updateMinimap() {
+        ctx.clearRect(0, 0, minimapCanvas.width, minimapCanvas.height);
+
+        // Draw map background
+        ctx.fillStyle = '#2d5a27';
+        ctx.fillRect(0, 0, minimapCanvas.width, minimapCanvas.height);
+
+        // Draw grid
+        ctx.strokeStyle = '#4a7c42';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= minimapCanvas.width; i += 20) {
+            ctx.beginPath();
+            ctx.moveTo(i, 0);
+            ctx.lineTo(i, minimapCanvas.height);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(0, i);
+            ctx.lineTo(minimapCanvas.width, i);
+            ctx.stroke();
+        }
+
+        // Center point (0, 0)
+        const centerX = minimapCanvas.width / 2;
+        const centerY = minimapCanvas.height / 2;
+
+        // Draw player position (camera position)
+        const playerX = centerX + (camera.position.x * scale);
+        const playerY = centerY + (camera.position.z * scale);
+
+        // Keep player dot within bounds
+        const clampedPlayerX = Math.max(5, Math.min(minimapCanvas.width - 5, playerX));
+        const clampedPlayerY = Math.max(5, Math.min(minimapCanvas.height - 5, playerY));
+
+        // Player triangle (pointing in movement direction)
+        ctx.fillStyle = '#ff0000';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+
+        const direction = new THREE.Vector3();
+        camera.getWorldDirection(direction);
+        const angle = Math.atan2(direction.x, direction.z);
+
+        ctx.save();
+        ctx.translate(clampedPlayerX, clampedPlayerY);
+        ctx.rotate(angle);
+        ctx.beginPath();
+        ctx.moveTo(0, -6);
+        ctx.lineTo(-4, 4);
+        ctx.lineTo(4, 4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+
+        // Draw houses
+        houses.forEach(house => {
+            const houseX = centerX + (house.x * scale);
+            const houseY = centerY + (house.z * scale);
+
+            if (houseX >= 0 && houseX <= minimapCanvas.width && houseY >= 0 && houseY <= minimapCanvas.height) {
+                ctx.fillStyle = '#8B4513';
+                ctx.fillRect(houseX - 3, houseY - 3, 6, 6);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(houseX - 3, houseY - 3, 6, 6);
+            }
+        });
+
+        // Pond removed from minimap
+
+        // Draw trees
+        trunkMeshes.forEach(tree => {
+            if (tree && tree.position) {
+                const treeX = centerX + (tree.position.x * scale);
+                const treeY = centerY + (tree.position.z * scale);
+
+                if (treeX >= 0 && treeX <= minimapCanvas.width && treeY >= 0 && treeY <= minimapCanvas.height) {
+                    ctx.fillStyle = '#228B22';
+                    ctx.beginPath();
+                    ctx.arc(treeX, treeY, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        });
+
+        // Draw humans
+        animatedHumans.forEach(human => {
+            if (human && human.position) {
+                const humanX = centerX + (human.position.x * scale);
+                const humanY = centerY + (human.position.z * scale);
+
+                if (humanX >= 0 && humanX <= minimapCanvas.width && humanY >= 0 && humanY <= minimapCanvas.height) {
+                    ctx.fillStyle = '#4169E1';
+                    ctx.beginPath();
+                    ctx.arc(humanX, humanY, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        });
+
+        // Draw Soviet buildings
+        sovietBuildingPositions.forEach(building => {
+            const buildingX = centerX + (building.x * scale);
+            const buildingY = centerY + (building.z * scale);
+
+            if (buildingX >= 0 && buildingX <= minimapCanvas.width && buildingY >= 0 && buildingY <= minimapCanvas.height) {
+                ctx.fillStyle = '#696969';
+                ctx.fillRect(buildingX - 4, buildingY - 4, 8, 8);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(buildingX - 4, buildingY - 4, 8, 8);
+            }
+        });
+
+        // Draw compass rose
+        const compassSize = 30;
+        const compassX = minimapCanvas.width - compassSize - 10;
+        const compassY = minimapCanvas.height - compassSize - 10;
+
+        // Compass background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.beginPath();
+        ctx.arc(compassX + compassSize/2, compassY + compassSize/2, compassSize/2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Compass directions
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+
+        // N
+        ctx.beginPath();
+        ctx.moveTo(compassX + compassSize/2, compassY + 5);
+        ctx.lineTo(compassX + compassSize/2, compassY + compassSize - 5);
+        ctx.stroke();
+
+        // S
+        ctx.beginPath();
+        ctx.moveTo(compassX + compassSize/2, compassY + compassSize - 5);
+        ctx.lineTo(compassX + compassSize/2, compassY + 5);
+        ctx.stroke();
+
+        // E
+        ctx.beginPath();
+        ctx.moveTo(compassX + 5, compassY + compassSize/2);
+        ctx.lineTo(compassX + compassSize - 5, compassY + compassSize/2);
+        ctx.stroke();
+
+        // W
+        ctx.beginPath();
+        ctx.moveTo(compassX + compassSize - 5, compassY + compassSize/2);
+        ctx.lineTo(compassX + 5, compassY + compassSize/2);
+        ctx.stroke();
+
+        // Direction labels
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('N', compassX + compassSize/2, compassY + 15);
+        ctx.fillText('S', compassX + compassSize/2, compassY + compassSize - 8);
+        ctx.fillText('E', compassX + compassSize - 8, compassY + compassSize/2 + 3);
+        ctx.fillText('W', compassX + 8, compassY + compassSize/2 + 3);
+    }
+
+    // Update minimap every frame
+    function animateMinimap() {
+        updateMinimap();
+        requestAnimationFrame(animateMinimap);
+    }
+    animateMinimap();
+
+    return minimapContainer;
+}
+
+// Create minimap when game starts
+const minimapStartButton = document.getElementById('start-button');
+if (minimapStartButton) {
+    minimapStartButton.addEventListener('click', () => {
+        // Minimap is created when pointer lock starts
+        setTimeout(() => {
+            createMinimap();
+        }, 100);
+    });
+}
 
 // Expose a runtime handle for the editor to avoid import/export edge-cases
 window.__GAME = {
