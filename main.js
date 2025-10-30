@@ -1324,18 +1324,6 @@ function createAnimatedHuman(x, z) {
             stateTimer += delta;
             walkCycle += delta * currentSpeed;
 
-            // Check distance to player for activation
-            const distanceToPlayer = Math.hypot(
-                model.position.x - camera.position.x,
-                model.position.z - camera.position.z
-            );
-
-            // Only animate if close to player
-            if (distanceToPlayer > 50) {
-                // NPCs far from player don't move
-                return;
-            }
-
             // State management with realistic transitions
             if (animationState === 'walking' || animationState === 'running') {
                 // Random state changes while moving
@@ -1509,18 +1497,6 @@ function createAnimatedHuman(x, z) {
                 walkTime += delta;
                 stateTimer += delta;
                 walkCycle += delta * currentSpeed;
-    
-                // Check distance to player for activation
-                const distanceToPlayer = Math.hypot(
-                    model.position.x - camera.position.x,
-                    model.position.z - camera.position.z
-                );
-    
-                // Only animate if close to player
-                if (distanceToPlayer > 50) {
-                    // NPCs far from player don't move
-                    return;
-                }
     
                 // State management with realistic transitions
                 if (animationState === 'walking' || animationState === 'running') {
