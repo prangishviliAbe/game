@@ -10,6 +10,12 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB); // Sky blue background
 scene.fog = new THREE.Fog(0x87CEEB, 100, 800); // Add fog for depth, increased near and far distances
 
+// Procedural sky
+const skyObj = new Sky();
+skyObj.scale.setScalar(10000);
+scene.add(skyObj);
+
+
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
 // Try to create WebGL renderer with fallback options
 let renderer;
@@ -474,41 +480,15 @@ scene.add(ground);
 // Add banks around the ocean - removed since we now have a 3D ocean model
 
 
-// Skybox using downloaded GLTF model
-let skyModel = null;
-loadGLTFModel('assets/models/downloads/sky/skybox_skydays_3.glb', (gltf) => {
-    skyModel = gltf.scene;
-    skyModel.scale.setScalar(10000); // Make it very large to encompass the scene
-    scene.add(skyModel);
+// Skybox using procedural sky (GLTF skybox removed to avoid conflicts)
+scene.background = new THREE.Color(0x87CEEB); // Sky blue background
+scene.fog = new THREE.Fog(0x87CEEB, 100, 800); // Add fog for depth
 
-    // Apply sky material properties for realistic rendering
-    skyModel.traverse(function (object) {
-        if (object.isMesh) {
-            object.castShadow = false;
-            object.receiveShadow = false;
-            if (object.material) {
-                object.material.side = THREE.BackSide; // Render from inside
-                object.material.needsUpdate = true;
-            }
-        }
-    });
-}, (error) => {
-    console.warn('Failed to load sky model, falling back to procedural sky:', error);
-    // Fallback to procedural sky
-    const sky = new Sky();
-    sky.scale.setScalar(10000);
-    scene.add(sky);
-
-    const skyUniforms = sky.material.uniforms;
-    skyUniforms['turbidity'].value = 10;
-    skyUniforms['rayleigh'].value = 2;
-    skyUniforms['mieCoefficient'].value = 0.005;
-    skyUniforms['mieDirectionalG'].value = 0.8;
-});
 
 const sun = new THREE.Vector3();
 const pmremGenerator = new THREE.PMREMGenerator(renderer);
 let renderTarget;
+let skyUniforms = null; // Will be set if procedural sky is used
 
 // Sun update function removed
 
@@ -1199,16 +1179,16 @@ function updateWeather(delta) {
                     drop.position.z = (Math.random() - 0.5) * 200;
                 }
             }
-            // Darken sky during rain
-            skyUniforms['turbidity'].value = 5; // Reduce sky clarity
+            // Darken sky during rain (only if procedural sky is used)
+            if (skyUniforms) skyUniforms['turbidity'].value = 5; // Reduce sky clarity
         } else {
             // Stop rain
             isRaining = false;
             for (const drop of rainDrops) {
                 drop.visible = false;
             }
-            // Restore sky
-            skyUniforms['turbidity'].value = 10; // Restore sky clarity
+            // Restore sky (only if procedural sky is used)
+            if (skyUniforms) skyUniforms['turbidity'].value = 10; // Restore sky clarity
         }
     }
 }
@@ -2654,6 +2634,54 @@ for (let i = 0; i < 7; i++) {
     createAnimatedHuman(x, z);
 }
 
+// Add 5 cars using the old_rusty_car.glb model near houses (much further away from houses)
+const carPositions = [
+    { x: -45, z: 55 }, // Near house 1
+    { x: 60, z: 50 },  // Near house 2
+    { x: -35, z: -55 }, // Near house 3
+    { x: 65, z: -50 },  // Near house 4
+    { x: 15, z: 70 }   // Near center area
+];
+
+// Add car models at the marked positions
+carPositions.forEach((pos, index) => {
+    loadGLTFModel('assets/models/downloads/cars/old_rusty_car.glb', (gltf) => {
+        console.log(`Car ${index + 1} loaded successfully`);
+        const car = gltf.scene;
+        const scale = 0.008 + Math.random() * 0.004; // Final smaller realistic car size
+        car.scale.set(scale, scale, scale);
+        car.position.set(pos.x, 0, pos.z);
+
+        // Random rotation for variety
+        car.rotation.y = Math.random() * Math.PI * 2;
+
+        car.traverse(function (object) {
+            if (object.isMesh) {
+                console.log(`Processing car ${index + 1} mesh:`, object.name);
+                object.castShadow = true;
+                object.receiveShadow = true;
+                // Apply realistic car materials
+                if (object.material) {
+                    if (object.material.map) {
+                        object.material.map.colorSpace = THREE.SRGBColorSpace;
+                    }
+                    object.material.roughness = 0.8;
+                    object.material.metalness = 0.3;
+                    object.material.needsUpdate = true;
+                }
+            }
+        });
+
+        scene.add(car);
+        console.log(`Car ${index + 1} added to scene at (${pos.x}, ${pos.z})`);
+
+        // Add car to obstacles for collision (medium radius)
+        obstacles.push({ x: pos.x, z: pos.z, radius: 4 });
+    }, (error) => {
+        console.warn(`Failed to load car model ${index + 1}:`, error);
+    });
+});
+
 // Ducks removed as requested
 
 // GLTF Loader for 3D models
@@ -3012,8 +3040,6 @@ function animate() {
     // Update ocean model animation if it exists
     // (Water animation is handled by the GLTF model's built-in animation mixer)
 
-    // update sky for reflections
-    sky.material.uniforms['sunPosition'].value.copy(sun);
 
     // Animate house doors
     for (const h of houses) {
