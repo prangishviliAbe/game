@@ -1,6 +1,6 @@
-# Jungle Adventure (browser) 🏞️
+# Anomalx 🌀
 
-Immersive 3D jungle adventure featuring realistic human characters and dynamic environments built with Three.js.
+Immersive 3D anomaly exploration featuring mysterious human manifestations and dynamic environments built with Three.js.
 
 **🎮 Features:**
 
@@ -57,7 +57,7 @@ GitHub Pages demo
 License
 
 - The game code in this repository is provided under the MIT license. Check upstream texture licenses (AmbientCG) for usage rules (they are typically CC0/CC-BY).
-  Jungle Adventure — local run instructions
+  Anomalx — local run instructions
 
 How to run
 
